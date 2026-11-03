@@ -1,0 +1,370 @@
+<!-- Adapted from MAA Views/UI/RootView.xaml and TaskQueueView.xaml.
+     MAA Team, AGPL-3.0; see UPSTREAM.md for the exact source revision.
+     Changes: remove Arknights settings/bindings, use the Chao2 worker and teal accent. -->
+<hc:Window x:Class="Chao2Harvester.MainWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:hc="https://handyorg.github.io/handycontrol"
+ xmlns:dd="urn:gong-wpf-dragdrop"
+ xmlns:local="clr-namespace:Chao2Harvester"
+ Title="超二收菜" Width="1050" Height="650" MinWidth="1000" MinHeight="600"
+ Icon="chao2.png" ShowTitle="True" WindowStartupLocation="CenterScreen"
+ FontFamily="Microsoft YaHei UI" FontSize="13" Closing="OnClosing">
+ <hc:Window.Resources>
+  <DataTemplate x:Key="OtherToolsTemplate">
+        <StackPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+         <Expander x:Name="WildExpander" HorizontalContentAlignment="Stretch" Margin="0,0,0,2">
+          <Expander.Header>
+           <CheckBox x:Name="WildCaptureSwitch" Content="野生怪兽捕捉" IsChecked="{Binding WildCaptureEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+            Margin="0,2" ToolTip="收菜途中遇到野生怪兽时自动处理；只捕捉勾选品级，捕兽夹不足则跳过并提醒。" />
+          </Expander.Header>
+          <StackPanel Margin="18,0,0,2">
+           <ItemsControl x:Name="WildGradesList" ItemsSource="{Binding WildGrades}" IsEnabled="{Binding WildCaptureEnabled}">
+            <ItemsControl.ItemTemplate><DataTemplate>
+             <Grid Margin="6,2">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /><ColumnDefinition Width="70" /><ColumnDefinition Width="20" /></Grid.ColumnDefinitions>
+              <CheckBox IsChecked="{Binding Enabled}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Label}">
+               <TextBlock Text="{Binding Label}" Foreground="{Binding Foreground}" FontWeight="SemiBold" />
+              </CheckBox>
+              <TextBlock Grid.Column="1" Text="最低成功率" VerticalAlignment="Center" />
+              <hc:NumericUpDown Grid.Column="2" Value="{Binding Probability, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Minimum="{Binding MinimumProbability}" Maximum="100" Increment="5" Height="30"
+               IsEnabled="{Binding Enabled}" AutomationProperties.Name="最低捕捉成功率" />
+              <TextBlock Grid.Column="3" Text="%" VerticalAlignment="Center" Margin="5,0,0,0" />
+             </Grid>
+            </DataTemplate></ItemsControl.ItemTemplate>
+           </ItemsControl>
+           <TextBlock Text="{Binding WildSaveError}" Visibility="{Binding WildSaveErrorVisibility}" TextWrapping="Wrap"
+            Foreground="{DynamicResource ErrorLogBrush}" Margin="6,2" />
+          </StackPanel>
+         </Expander>
+         <Expander x:Name="AbyssExpander" HorizontalContentAlignment="Stretch" Margin="0,0,0,2">
+          <Expander.Header>
+           <CheckBox x:Name="AbyssSwitch" Content="深渊先遣" IsChecked="{Binding SelectedTask.AbyssOption.Checked}" Margin="0,2"
+            ToolTip="每周二、四、六00:00刷新；先切换所选队伍，再压制词缀并挑战，体力不足50时跳过。" />
+          </Expander.Header>
+          <local:TaskOptionsView x:Name="AbyssOptionsView" DataContext="{Binding AbyssTool}" IsEnabled="{Binding DataContext.SelectedTask.AbyssOption.Checked, RelativeSource={RelativeSource AncestorType=Window}}"
+           Margin="12,0,0,0" MaxHeight="230" />
+         </Expander>
+        </StackPanel>
+  </DataTemplate>
+ </hc:Window.Resources>
+ <Grid Background="{DynamicResource RegionBrush}">
+  <TabControl x:Name="Pages" Style="{StaticResource TabControlInLine}"
+   BorderThickness="0,1,0,0" Background="{DynamicResource RegionBrushOpacity25}">
+   <TabControl.ItemContainerStyle>
+    <Style TargetType="TabItem" BasedOn="{StaticResource TabItemInLine}">
+     <Setter Property="Background" Value="{DynamicResource RegionBrushOpacity25}" />
+    </Style>
+   </TabControl.ItemContainerStyle>
+   <TabItem Header="一键收菜">
+    <Grid x:Name="TaskQueueLayout" Margin="18,20,18,16">
+     <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="258" />
+      <ColumnDefinition Width="350" />
+      <ColumnDefinition Width="*" />
+     </Grid.ColumnDefinitions>
+     <!-- MAA task list, selection controls and start/stop placement. -->
+     <Grid x:Name="TaskControlPanel" Grid.Column="0" Margin="0,10,12,10">
+      <Grid.RowDefinitions>
+       <RowDefinition Height="*" />
+       <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Border Width="246" Background="{DynamicResource RegionBrushOpacity25}"
+       BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+       <Grid Width="234">
+        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="40" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <ListBox x:Name="TaskList" ItemsSource="{Binding Tasks}" MinHeight="220" Margin="0,10,0,0"
+         BorderThickness="0" Background="Transparent" Style="{StaticResource NoSelectedHighlightListBoxStyle}"
+         dd:DragDrop.DragDropContext="{Binding RelativeSource={RelativeSource Self}}" dd:DragDrop.IsDragSource="{Binding Idle}" dd:DragDrop.IsDropTarget="{Binding Idle}"
+         IsEnabled="{Binding Idle}" Opacity="1" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+         <ListBox.ItemTemplate>
+          <DataTemplate>
+           <Border CornerRadius="4">
+            <Border.Style>
+             <Style TargetType="Border">
+              <Setter Property="Background" Value="Transparent" />
+              <Style.Triggers>
+               <DataTrigger Binding="{Binding State}" Value="运行中"><Setter Property="Background" Value="{DynamicResource TaskQueue.TaskItemStatus.InProgress}" /></DataTrigger>
+               <DataTrigger Binding="{Binding State}" Value="完成"><Setter Property="Background" Value="{DynamicResource TaskQueue.TaskItemStatus.Completed}" /></DataTrigger>
+               <DataTrigger Binding="{Binding State}" Value="待校准"><Setter Property="Background" Value="{DynamicResource TaskQueue.TaskItemStatus.Error}" /></DataTrigger>
+              </Style.Triggers>
+             </Style>
+            </Border.Style>
+            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+             <!-- MAA places the single-select gear behind the row checkbox. -->
+             <hc:ButtonGroup Grid.ColumnSpan="2">
+              <RadioButton x:Name="TaskSettingRadioButton" GroupName="TaskSettings" IsChecked="{Binding EnableSetting}"
+               Opacity="1"
+               Style="{DynamicResource RadioGroupItemSingle}" Checked="ConfigureTask"
+               Margin="0,0,4,0" Padding="0" HorizontalContentAlignment="Right" Background="Transparent" BorderThickness="0"
+               hc:VisualElement.HighlightBackground="Transparent" hc:VisualElement.HighlightForeground="{DynamicResource PrimaryBrush}"
+               ToolTip="单击设置，拖动调整顺序" AutomationProperties.Name="{Binding Name, StringFormat={}{0}设置}">
+               <Grid Width="16" Height="16" HorizontalAlignment="Right">
+                <Path Data="{StaticResource ConfigGeometry}" Stretch="Uniform">
+                 <Path.Style><Style TargetType="Path">
+                  <Setter Property="Fill" Value="{DynamicResource SecondaryTextBrush}" />
+                  <Style.Triggers>
+                   <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=RadioButton}}" Value="True"><Setter Property="Fill" Value="{DynamicResource PrimaryBrush}" /></DataTrigger>
+                   <DataTrigger Binding="{Binding EnableSetting}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                  </Style.Triggers>
+                 </Style></Path.Style>
+                </Path>
+                <Path Data="{StaticResource ConfigGeometry2}" Fill="{DynamicResource PrimaryBrush}" Stretch="Uniform">
+                 <Path.Style><Style TargetType="Path">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                  <Style.Triggers><DataTrigger Binding="{Binding EnableSetting}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+                 </Style></Path.Style>
+                </Path>
+               </Grid>
+              </RadioButton>
+             </hc:ButtonGroup>
+             <CheckBox IsChecked="{Binding Enabled}" MaxWidth="140" HorizontalAlignment="Left"
+              Opacity="1" Margin="4.5,0,0,0" ToolTip="{Binding Description}" AutomationProperties.Name="{Binding Name}">
+              <TextBlock Text="{Binding Name}" Visibility="Hidden" />
+             </CheckBox>
+             <TextBlock Grid.Column="0" Margin="26,0,4,0" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" IsHitTestVisible="False" />
+             <!-- MAA's hover actions share the row's name column and sit before its gear. -->
+             <StackPanel Grid.Column="1" Margin="0,0,26,0" HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal">
+              <StackPanel.Style><Style TargetType="StackPanel">
+               <Setter Property="Visibility" Value="Collapsed" />
+               <Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}" Value="True" />
+                <Condition Binding="{Binding DataContext.Idle, RelativeSource={RelativeSource AncestorType=Window}}" Value="True" />
+               </MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers>
+              </Style></StackPanel.Style>
+              <Button hc:IconElement.Geometry="{StaticResource CopyTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}" ToolTip="复制" Click="CopyQueueTaskClick"
+               IsEnabled="{Binding DataContext.AllowRepeatTasks, RelativeSource={RelativeSource AncestorType=Window}}" />
+              <Button hc:IconElement.Geometry="{StaticResource RenameTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}" ToolTip="重命名" Click="RenameQueueTaskClick" />
+              <Button hc:IconElement.Geometry="{StaticResource DeleteTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}" ToolTip="删除" Click="RemoveQueueTaskClick" />
+             </StackPanel>
+            </Grid>
+           </Border>
+          </DataTemplate>
+         </ListBox.ItemTemplate>
+         <ListBox.ItemContainerStyle>
+          <Style TargetType="ListBoxItem" BasedOn="{StaticResource NoSelectedHighlightListBoxItemStyle}">
+           <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+           <Setter Property="Padding" Value="0" />
+           <Setter Property="Margin" Value="0,0,14,0" />
+           <Setter Property="MinHeight" Value="24.5" />
+           <Setter Property="Height" Value="Auto" />
+           <Style.Triggers>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.72" /></Trigger>
+           </Style.Triggers>
+          </Style>
+         </ListBox.ItemContainerStyle>
+        </ListBox>
+        <Grid Grid.Row="1" IsEnabled="{Binding Idle}">
+         <Grid.ColumnDefinitions><ColumnDefinition Width="30" /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+         <Button x:Name="AddTaskButton" Content="＋" ToolTip="添加任务" IsEnabled="{Binding CanAddTask}" Height="30" Padding="0" HorizontalAlignment="Stretch" VerticalAlignment="Top" Click="AddQueueTaskClick" hc:BorderElement.CornerRadius="4,0,0,4" />
+         <Button Content="全选" Grid.Column="1" Height="30" Margin="-1,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Top" Click="SelectAll" hc:BorderElement.CornerRadius="0" />
+         <Button Content="清空" Grid.Column="2" Height="30" Margin="-1,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Top" Click="ClearSelection" hc:BorderElement.CornerRadius="0,4,4,0" />
+        </Grid>
+        <StackPanel Grid.Row="2" Margin="0,0,0,10" IsEnabled="{Binding Idle}">
+         <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="84" /><ColumnDefinition Width="*" /><ColumnDefinition Width="24" /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
+          <CheckBox x:Name="RepeatTasksBox" Content="重复任务" IsChecked="{Binding AllowRepeatTasks}" Margin="4,0,4,0" VerticalAlignment="Center" ToolTip="开启后可复制及重复添加；关闭时同类任务只保留列表最上面的一项。" />
+          <ComboBox x:Name="TemplatePicker" Grid.Column="1" ItemsSource="{Binding TaskTemplates}" SelectedItem="{Binding SelectedTemplate}" DisplayMemberPath="Name" IsEditable="True"
+           Text="{Binding SelectedTemplate.Name, UpdateSourceTrigger=LostFocus}" ToolTip="执行模板：可切换或直接修改名称，设置自动保存" MinWidth="0" />
+          <Button x:Name="AddTemplateButton" Grid.Column="2" Content="＋" Padding="0" Height="28" HorizontalAlignment="Stretch" Margin="2,0,0,0" ToolTip="新增模板（复制当前设置）" Click="AddTemplateClick" />
+          <Button x:Name="DeleteTemplateButton" Grid.Column="3" Content="−" Padding="0" Height="28" HorizontalAlignment="Stretch" Margin="2,0,0,0" IsEnabled="{Binding CanDeleteTemplate}" ToolTip="删除模板（至少保留一个）" Click="DeleteTemplateClick" />
+         </Grid>
+         <TextBlock Text="{Binding QueueSaveError}" Visibility="{Binding QueueSaveErrorVisibility}" Foreground="{DynamicResource ErrorLogBrush}" TextWrapping="Wrap" Margin="0,4,0,0" />
+        </StackPanel>
+       </Grid>
+      </Border>
+      <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,10,0,0">
+       <Button x:Name="StartButton" Content="开始" Width="100" Height="50" Margin="5" Click="StartRun"
+        Foreground="{DynamicResource PrimaryTextBrush}" Visibility="{Binding StartVisibility}" />
+       <Button x:Name="StopButton" Content="停止" Width="100" Height="50" Margin="5" Click="StopRun"
+        Visibility="{Binding StopVisibility}" IsEnabled="{Binding CanStop}" />
+      </Grid>
+     </Grid>
+     <Grid x:Name="TaskSettingsPanel" Grid.Column="1" IsEnabled="{Binding Idle}">
+      <local:TaskOptionsView x:Name="TaskOptions" Margin="0,10,0,10" HorizontalAlignment="Stretch"
+       DataContext="{Binding SelectedTask}" Visibility="{Binding TaskSettingsVisibility, RelativeSource={RelativeSource AncestorType=Window}}">
+       <local:TaskOptionsView.OtherContent>
+        <ContentControl ContentTemplate="{StaticResource OtherToolsTemplate}" />
+       </local:TaskOptionsView.OtherContent>
+      </local:TaskOptionsView>
+     </Grid>
+     <Grid x:Name="LogPanel" Grid.Column="2" Margin="10,10,0,10">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" MinHeight="30" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <DockPanel>
+       <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource PrimaryBrush}" />
+      </DockPanel>
+      <hc:ScrollViewer x:Name="LogScroll" Grid.Row="1" Margin="0,8,0,8" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsInertiaEnabled="True" PanningMode="Both">
+       <ItemsControl x:Name="LogList" ItemsSource="{Binding LogGroups}">
+        <ItemsControl.ItemTemplate>
+         <DataTemplate>
+          <Expander Header="{Binding}" IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,3,0,5" HorizontalContentAlignment="Stretch">
+           <Expander.HeaderTemplate>
+            <DataTemplate>
+             <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding Time}" FontSize="11" Margin="0,0,8,0" Foreground="{DynamicResource TraceLogBrush}" />
+              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,10,0" />
+              <TextBlock Text="{Binding State}" Foreground="{Binding Foreground}" FontSize="12" />
+             </StackPanel>
+            </DataTemplate>
+           </Expander.HeaderTemplate>
+           <ItemsControl ItemsSource="{Binding Lines}" Margin="6,1,0,5">
+            <ItemsControl.ItemTemplate>
+             <DataTemplate>
+              <!-- Preserve MAA's timestamp, colored text and wrapping inside each task. -->
+              <Grid>
+               <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+               <TextBlock Text="{Binding Time}" Margin="0,5,10,5" Foreground="{DynamicResource TraceLogBrush}" VerticalAlignment="Top" />
+               <TextBlock Grid.Column="1" Margin="0,5" Text="{Binding Text}" Foreground="{Binding Foreground}" FontWeight="{Binding Weight}" TextWrapping="Wrap" VerticalAlignment="Top" />
+              </Grid>
+             </DataTemplate>
+            </ItemsControl.ItemTemplate>
+           </ItemsControl>
+          </Expander>
+         </DataTemplate>
+        </ItemsControl.ItemTemplate>
+       </ItemsControl>
+      </hc:ScrollViewer>
+      <TextBlock Grid.Row="2" Text="{Binding ResourceSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+     </Grid>
+    </Grid>
+   </TabItem>
+   <TabItem x:Name="ToolsTab" Header="小工具">
+    <Grid Margin="24,22,24,18">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="700" /><ColumnDefinition Width="24" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+     <!-- MAA Toolbox uses nested TabControlSliding pages for independent tools. -->
+     <TabControl x:Name="ToolsPages" Style="{StaticResource TabControlSliding}">
+      <TabItem Header="拼二大作战">
+       <StackPanel Margin="10,22,10,0">
+        <TextBlock Text="先在游戏中打开 丰野间 → 拼二大作战。" TextWrapping="Wrap" />
+        <TextBlock Text="达到目标即停止；未达目标则输后重开。" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,7,0,15" />
+        <local:TaskOptionsView x:Name="PuzzleOptionsView" DataContext="{Binding PuzzleTool}"
+         IsEnabled="{Binding Idle, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <Button x:Name="PuzzleStartButton" Content="开始拼二" Click="StartPuzzle" IsEnabled="{Binding Idle}"
+         HorizontalAlignment="Left" Margin="6,0,0,14" />
+        <TextBlock Text="{Binding PuzzleSummary}" Foreground="{DynamicResource PrimaryBrush}" Margin="0,0,0,12" />
+        <ItemsControl ItemsSource="{Binding PuzzleCells}" Width="240" Height="240" HorizontalAlignment="Center">
+         <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="3" Columns="3" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+         <ItemsControl.ItemTemplate><DataTemplate>
+          <Border Margin="3" Background="{DynamicResource RegionBrushOpacity25}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+           <TextBlock Text="{Binding}" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+         </DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
+       </StackPanel>
+      </TabItem>
+      <TabItem Header="幻境巡游">
+       <Grid Margin="10,22,10,0">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <TextBlock Text="从世界地图或幻境巡游启动，逐个环境推进。" TextWrapping="Wrap" Margin="0,0,0,14" />
+        <local:TaskOptionsView x:Name="TourOptionsView" Grid.Row="1" DataContext="{Binding TourTool}" IsEnabled="{Binding Idle, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <Button Grid.Row="2" Content="开始巡游" Click="StartTour" IsEnabled="{Binding Idle}" HorizontalAlignment="Left" Margin="0,12,0,8" />
+       </Grid>
+      </TabItem>
+      <TabItem Header="连接检测">
+       <StackPanel Margin="10,22,10,0">
+        <TextBlock Text="检查 MuMu 连接并读取当前游戏画面。" TextWrapping="Wrap" Margin="0,0,0,16" />
+        <Button Content="只读检测" Click="Diagnose" IsEnabled="{Binding Idle}" HorizontalAlignment="Left" />
+        <Image x:Name="Preview" Height="230" Stretch="Uniform" Margin="0,20,0,0" />
+       </StackPanel>
+      </TabItem>
+      <TabItem Header="打开游戏">
+       <StackPanel Margin="10,22,10,0">
+        <TextBlock Text="启动已配置的 MuMu 和超进化物语2。" TextWrapping="Wrap" Margin="0,0,0,16" />
+        <Button Content="打开超二" Click="LaunchGame" IsEnabled="{Binding Idle}" HorizontalAlignment="Left" />
+       </StackPanel>
+      </TabItem>
+      <TabItem Header="运行记录">
+       <StackPanel Margin="10,22,10,0">
+        <TextBlock Text="保留最近5次运行，每次按运行时间建立文件夹，包含本次结果、截图及操作记录。" TextWrapping="Wrap" Margin="0,0,0,16" />
+        <Button Content="打开运行记录" Click="OpenReports" HorizontalAlignment="Left" />
+       </StackPanel>
+      </TabItem>
+      <TabItem x:Name="FreeSummonTab" Header="免费造唤">
+       <StackPanel Margin="16,22,16,0" IsEnabled="{Binding Idle}">
+        <CheckBox x:Name="FreeSummonSwitch" Content="自动免费造唤" IsChecked="{Binding FreeSummonEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,18" />
+        <TextBlock Text="收菜过程中，在任务间检查免费次数。冷却结束后前往对应造唤台，免费造唤一次。" TextWrapping="Wrap" Margin="0,0,0,10" />
+        <TextBlock Text="只用冷却恢复的免费次数，不使用造唤券或钻石。修改后自动保存。" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
+        <TextBlock Text="{Binding FreeSummonSaveError}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorLogBrush}" Margin="0,12,0,0" />
+       </StackPanel>
+      </TabItem>
+     </TabControl>
+     <Grid Grid.Column="2">
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <TextBlock Text="{Binding Status}" Foreground="{DynamicResource PrimaryBrush}" Margin="0,10,0,16" />
+      <hc:ScrollViewer x:Name="ToolLogScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto">
+       <ItemsControl ItemsSource="{Binding ToolLogs}"><ItemsControl.ItemTemplate><DataTemplate>
+        <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="64" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+         <TextBlock Text="{Binding Time}" Foreground="{DynamicResource SecondaryTextBrush}" />
+         <TextBlock Grid.Column="1" Text="{Binding Text}" Foreground="{Binding Foreground}" TextWrapping="Wrap" />
+        </Grid>
+       </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      </hc:ScrollViewer>
+      <Button Grid.Row="2" Content="停止" Width="100" Height="40" Margin="0,12,0,0" HorizontalAlignment="Left" Click="StopRun" IsEnabled="{Binding CanStop}" />
+     </Grid>
+    </Grid>
+   </TabItem>
+   <TabItem x:Name="SettingsTab" Header="设置">
+    <hc:ScrollViewer VerticalScrollBarVisibility="Auto" IsInertiaEnabled="True" PanningMode="VerticalOnly">
+     <StackPanel Margin="30,25" MaxWidth="650" HorizontalAlignment="Stretch">
+      <TextBlock Text="连接设置" FontWeight="SemiBold" Margin="0,0,0,12" />
+      <Grid IsEnabled="{Binding Idle}">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+       <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+       <TextBlock Text="MuMu ADB" /><TextBox x:Name="AdbPath" Grid.Column="1" Text="{Binding Adb, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+       <TextBlock Grid.Row="1" Text="连接地址" /><TextBox x:Name="AddressBox" Grid.Row="1" Grid.Column="1" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" />
+      </Grid>
+      <hc:Divider />
+      <TextBlock Text="任务执行" FontWeight="SemiBold" Margin="0,15,0,10" />
+      <CheckBox x:Name="OverviewOrderBox" Content="不按任务顺序执行" IsChecked="{Binding UnorderedTasks}" IsEnabled="{Binding Idle}" Margin="0,0,0,10"
+       ToolTip="优先执行玩法概览中先出现的已勾选任务。开始唤醒优先，玩法结束后任务领奖，最后执行其他任务。关闭后按原顺序执行。" />
+      <TextBlock Text="触发事件" FontWeight="SemiBold" Margin="0,15,0,10" />
+      <StackPanel IsEnabled="{Binding Idle}">
+       <local:TaskOptionsView x:Name="TriggerEventsView" DataContext="{Binding TriggerEventsTool}" />
+       <TextBlock Text="关闭后遇到该事件会暂停，等待手动处理。修改后自动保存。" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" Margin="6,0,6,8" />
+       <Expander x:Name="MerchantExpander" Header="神秘商人处理方式" IsEnabled="{Binding MerchantEventEnabled}" Margin="6,4,6,8">
+        <StackPanel Margin="12,8,0,0">
+         <local:TaskOptionsView x:Name="MerchantOptionsView" DataContext="{Binding MerchantTool}" MaxHeight="330" />
+         <TextBlock Text="购买模式仅购买勾选物品，按拖动顺序选择，受本轮钻石预算限制。" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" Margin="6,4,6,8" />
+         <TextBlock Text="{Binding MerchantSaveError}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorLogBrush}" />
+        </StackPanel>
+       </Expander>
+       <TextBlock Text="{Binding TriggerSaveError}" TextWrapping="Wrap" Foreground="{DynamicResource ErrorLogBrush}" Margin="6,0" />
+      </StackPanel>
+      <TextBlock Text="运行显示" FontWeight="SemiBold" Margin="0,15,0,10" />
+      <CheckBox Content="运行时自动切换当前任务设置" IsChecked="{Binding FollowRunningTask}" IsEnabled="{Binding Idle}" Margin="0,0,0,10" />
+      <TextBlock Text="体力补充后优先级" FontWeight="SemiBold" Margin="0,15,0,10" />
+      <TextBlock Text="体力补充选项位于各体力玩法的设置中。" Margin="0,0,0,10" />
+      <ListBox ItemsSource="{Binding StaminaPriority}" IsEnabled="{Binding Idle}" Width="270" HorizontalAlignment="Left" Style="{StaticResource PlanList}"
+       dd:DragDrop.DragDropContext="{Binding RelativeSource={RelativeSource Self}}" dd:DragDrop.IsDragSource="True" dd:DragDrop.IsDropTarget="True">
+       <ListBox.ItemTemplate><DataTemplate>
+        <Grid Margin="0,3" Height="30">
+         <Grid.ColumnDefinitions><ColumnDefinition Width="26" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+         <Border Cursor="SizeAll" ToolTip="拖动调整优先级" Background="Transparent" Padding="7,8">
+          <Path Data="{StaticResource AlignHStretchGeometry}" Fill="{DynamicResource SecondaryTextBrush}" Stretch="Uniform" />
+         </Border>
+         <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" />
+        </Grid>
+       </DataTemplate></ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock Text="首轮按左侧任务列表顺序执行；补充体力后的续跑按此优先级。开启“不按任务顺序执行”时，首轮优先按玩法概览选择。开始唤醒始终最先，结束关闭始终最后。" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,8,0,5" />
+      <Button Content="保存设置" HorizontalAlignment="Right" Margin="0,15" IsEnabled="{Binding Idle}" Click="SaveClick" />
+      <TextBlock Text="仅神秘商人购买模式可按所选物品及预算使用钻石；不使用极化石，药水按任务设置使用；不重置森林、不发送玩家消息。" TextWrapping="Wrap" Margin="0,8,0,8" />
+      <TextBlock Text="每轮仅执行勾选项目。只读检测不点击游戏；未识别页面会停止并保存记录。" Foreground="{DynamicResource SecondaryTextBrush}" TextWrapping="Wrap" />
+     </StackPanel>
+    </hc:ScrollViewer>
+   </TabItem>
+   <TabItem Header="关于">
+    <StackPanel Margin="40,35" HorizontalAlignment="Left">
+     <Image Source="chao2.png" Width="64" Height="64" HorizontalAlignment="Left" Margin="0,0,0,15" />
+     <TextBlock Text="超二收菜" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,10" />
+     <TextBlock Text="MAA WPF 界面改编 · MaaFramework 本地识图" Margin="0,0,0,8" />
+     <TextBlock Text="仅手动启动，无定时任务。当前可用玩法及验证记录见项目说明。" TextWrapping="Wrap" Margin="0,0,0,20" />
+     <StackPanel Orientation="Horizontal">
+      <Button Content="项目说明" Click="OpenReadme" Margin="0,0,10,0" />
+      <Button Content="开源许可" Click="OpenLicense" />
+     </StackPanel>
+    </StackPanel>
+   </TabItem>
+  </TabControl>
+ </Grid>
+</hc:Window>

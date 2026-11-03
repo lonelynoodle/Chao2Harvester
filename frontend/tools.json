@@ -1,0 +1,233 @@
+[
+  {
+    "key": "puzzle",
+    "name": "拼二大作战",
+    "legacy_goals": {
+      "300": 300,
+      "1500": 1500,
+      "first": 7172
+    },
+    "fields": [
+      {
+        "key": "puzzle_target_score",
+        "type": "number",
+        "label": "目标分数",
+        "default": 7172,
+        "min": 1,
+        "max": 7172,
+        "description": "当前单局达到目标后停止；最高7172分。"
+      },
+      {
+        "key": "puzzle_max_games",
+        "type": "number",
+        "label": "最多局数（0不限）",
+        "default": 0,
+        "min": 0,
+        "max": 10000,
+        "description": "0表示未达目标就输后重开；正数包含启动时接续的当前局。"
+      }
+    ]
+  },
+  {
+    "key": "tour",
+    "name": "幻境巡游",
+    "hint": "按阵容顺序尝试，失败换队；全部失败后换环境。",
+    "fields": [
+      {
+        "key": "teams",
+        "type": "teams",
+        "label": "阵容顺序",
+        "default": [
+          1,
+          2,
+          3
+        ],
+        "min": 1,
+        "max": 5
+      },
+      {
+        "key": "max_battles",
+        "type": "number",
+        "label": "最多挑战次数",
+        "default": 100,
+        "min": 1,
+        "max": 500
+      }
+    ]
+  },
+  {
+    "key": "wild_capture",
+    "name": "野生怪兽",
+    "rarities": [
+      {
+        "id": "young",
+        "label": "幼体",
+        "color": "#398344",
+        "probability": 80
+      },
+      {
+        "id": "phantom",
+        "label": "幻化",
+        "color": "#287BC1",
+        "probability": 90,
+        "minimum_probability": 90
+      },
+      {
+        "id": "ultimate",
+        "label": "究极",
+        "color": "#914BC0",
+        "probability": 80
+      },
+      {
+        "id": "immortal",
+        "label": "不朽",
+        "color": "#AA770F",
+        "probability": 100
+      },
+      {
+        "id": "awakened",
+        "label": "觉醒",
+        "color": "#D94044",
+        "probability": 100
+      }
+    ]
+  },
+  {
+    "key": "abyss",
+    "name": "深渊先遣",
+    "fields": [
+      {
+        "key": "teams",
+        "type": "teams",
+        "label": "阵容顺序",
+        "default": [
+          1,
+          2,
+          3
+        ],
+        "min": 1,
+        "max": 5
+      }
+    ]
+  },
+  {
+    "key": "merchant",
+    "name": "神秘商人",
+    "fields": [
+      {
+        "key": "mode",
+        "label": "遇到神秘商人时",
+        "type": "choice",
+        "default": "skip",
+        "choices": [
+          {
+            "id": "stop",
+            "label": "自动停止"
+          },
+          {
+            "id": "skip",
+            "label": "跳过不购买"
+          },
+          {
+            "id": "random",
+            "label": "随机点击（不购买）"
+          },
+          {
+            "id": "buy",
+            "label": "购买指定物品"
+          }
+        ]
+      },
+      {
+        "key": "diamond_budget",
+        "label": "本轮购买预算（钻石）",
+        "type": "number",
+        "min": 0,
+        "max": 100000,
+        "default": 240,
+        "enabled_when": "mode",
+        "enabled_value": "buy"
+      },
+      {
+        "key": "items",
+        "label": "购买优先级",
+        "type": "order",
+        "counts": false,
+        "enabled_when": "mode",
+        "enabled_value": "buy",
+        "default": [
+          {
+            "id": "evolution",
+            "label": "进化孢子",
+            "enabled": false
+          },
+          {
+            "id": "spore",
+            "label": "强化孢子",
+            "enabled": false
+          },
+          {
+            "id": "divinity",
+            "label": "神性孢子",
+            "enabled": false
+          },
+          {
+            "id": "realm",
+            "label": "领域石",
+            "enabled": false
+          },
+          {
+            "id": "polarization",
+            "label": "极化石",
+            "enabled": false
+          },
+          {
+            "id": "gold",
+            "label": "金币",
+            "enabled": false
+          },
+          {
+            "id": "dust",
+            "label": "粉尘",
+            "enabled": false
+          },
+          {
+            "id": "lifesteal_core",
+            "label": "嗜血·真实伤害元核",
+            "enabled": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "key": "trigger_events",
+    "name": "触发事件",
+    "fields": [
+      {
+        "key": "merchant",
+        "label": "处理神秘商人",
+        "type": "bool",
+        "default": true
+      },
+      {
+        "key": "sage_quiz",
+        "label": "自动问答（游荡智者）",
+        "type": "bool",
+        "default": true
+      },
+      {
+        "key": "star_gift",
+        "label": "自动关闭限时礼包",
+        "type": "bool",
+        "default": true
+      },
+      {
+        "key": "rift_invitation",
+        "label": "自动拒绝凿星裂痕邀请",
+        "type": "bool",
+        "default": true
+      }
+    ]
+  }
+]

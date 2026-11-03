@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Chao2Harvester</AssemblyName>
+    <ApplicationIcon>../assets/chao2.ico</ApplicationIcon>
+    <Version>0.9.66</Version>
+    <Product>超二收菜</Product>
+    <Title>超二收菜</Title>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="HandyControls" Version="3.6.0" />
+    <PackageReference Include="gong-wpf-dragdrop" Version="4.0.0" />
+    <Resource Include="../assets/chao2.ico" Link="chao2.ico" />
+    <Resource Include="../assets/chao2.png" Link="chao2.png" />
+    <Resource Include="../assets/rewards/*.png" Link="rewards/%(Filename)%(Extension)" />
+    <Content Include="tasks.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="tools.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)handycontrols/3.6.0/LICENSE" Link="HandyControls-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)gong-wpf-dragdrop/4.0.0/LICENSE" Link="Gong-WPF-DragDrop-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

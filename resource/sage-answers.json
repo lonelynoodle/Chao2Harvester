@@ -1,0 +1,14 @@
+{
+  "questions": [
+    {
+      "questions": ["部落一个赛季通常会持续多久?"],
+      "answers": ["一个月", "1个月"],
+      "verified": "2026-10-15 游戏客户端明确提示答对；reports/calibration-v088/sage-answer-result.png"
+    },
+    {
+      "questions": ["在超进化大陆霸气有什么用?"],
+      "answers": ["霸气越高击退敌人的距离越远"],
+      "verified": "2026-10-18 游戏客户端明确提示答对并领取奖励；reports/calibration-v0915/sage-113001/sage-result.png"
+    }
+  ]
+}

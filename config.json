@@ -1,0 +1,2410 @@
+{
+  "adb": "D:/Program Files/Netease/MuMu/nx_main/adb.exe",
+  "address": "127.0.0.1:16384",
+  "battle_timeout_seconds": 240,
+  "max_run_minutes": 90,
+  "close_mumu": false,
+  "mumu_index": 0,
+  "tasks": [
+    "startup",
+    "origin",
+    "celebration",
+    "tower",
+    "cocoon",
+    "exploration",
+    "hunt",
+    "main",
+    "tribe",
+    "rift",
+    "forest",
+    "copies",
+    "arena",
+    "nest",
+    "other",
+    "rewards",
+    "finish"
+  ],
+  "task_options": {
+    "startup": {},
+    "exploration": {},
+    "copies": {
+      "challenge_copies": true,
+      "teams": [
+        1
+      ],
+      "max_runs": 0,
+      "include_friends": true,
+      "wandering_sage": true,
+      "sage_until_end": true,
+      "auto_three_shots": true,
+      "auto_potions": false
+    },
+    "hunt": {
+      "team": "1",
+      "auto_settle": true,
+      "use_search_tokens": true,
+      "max_searches": 0,
+      "auto_three_shots": true,
+      "auto_potions": false
+    },
+    "main": {
+      "teams": [
+        2,
+        1
+      ],
+      "max_runs": 0,
+      "max_nodes": 20,
+      "auto_three_shots": true,
+      "auto_potions": false
+    },
+    "tower": {
+      "teams": [],
+      "max_runs": 0,
+      "reserve_feathers": 0,
+      "towers": [
+        {
+          "id": "normal",
+          "label": "\u65E0\u9650\u5236",
+          "enabled": true
+        },
+        {
+          "id": "dragon",
+          "label": "\u7956\u9F99\u65CF",
+          "enabled": true
+        },
+        {
+          "id": "star",
+          "label": "\u661F\u7075\u65CF",
+          "enabled": true
+        },
+        {
+          "id": "ghost",
+          "label": "\u5C38\u9B3C\u65CF",
+          "enabled": true
+        },
+        {
+          "id": "native",
+          "label": "\u539F\u751F\u65CF",
+          "enabled": true
+        },
+        {
+          "id": "puppet",
+          "label": "\u6728\u5076\u65CF",
+          "enabled": true
+        }
+      ],
+      "secret_garden": true
+    },
+    "cocoon": {
+      "teams": [
+        1,
+        2
+      ],
+      "reserve_spikes_enabled": false,
+      "reserve_spikes": 1,
+      "daily_tasks": true,
+      "refresh_tasks": false,
+      "refresh_require_three_spikes": true,
+      "max_refreshes": 0,
+      "targets": [
+        {
+          "id": "divinity",
+          "label": "\u795E\u6027\u96C6\u5408",
+          "enabled": true
+        },
+        {
+          "id": "gold",
+          "label": "\u5BCC\u6709",
+          "enabled": true
+        },
+        {
+          "id": "summon",
+          "label": "\u9020\u5524\u68A6\u5883",
+          "enabled": true
+        },
+        {
+          "id": "evolution",
+          "label": "\u8FDB\u5316\u8BD5\u70BC",
+          "enabled": true
+        },
+        {
+          "id": "stone",
+          "label": "\u4E00\u5730\u539F\u77F3",
+          "enabled": true
+        },
+        {
+          "id": "spore",
+          "label": "\u5168\u4F53\u5F3A\u5316",
+          "enabled": true
+        },
+        {
+          "id": "wall",
+          "label": "\u5899\u6218",
+          "enabled": true
+        },
+        {
+          "id": "experience",
+          "label": "\u7ECF\u9A8C",
+          "enabled": true
+        }
+      ]
+    },
+    "tribe": {
+      "teams": [
+        1
+      ],
+      "max_runs": 0,
+      "reserve_orders": 0,
+      "random_totem": true
+    },
+    "rift": {
+      "teams": [
+        2,
+        1
+      ],
+      "max_runs": 0,
+      "reserve_keys": 0
+    },
+    "forest": {
+      "teams": [
+        1,
+        2
+      ],
+      "max_runs": 0,
+      "mode": "simple",
+      "strategy": "overflow",
+      "reserve_points": 0,
+      "max_explorations": 0,
+      "collect_resources": true,
+      "node_priority": [
+        {
+          "id": "lamp",
+          "label": "\u68EE\u706F",
+          "enabled": true
+        },
+        {
+          "id": "beast",
+          "label": "\u51F6\u517D",
+          "enabled": true
+        },
+        {
+          "id": "spring",
+          "label": "\u547D\u8FD0\u4E4B\u6CC9",
+          "enabled": true
+        },
+        {
+          "id": "divinity",
+          "label": "\u795E\u6027\u5B62\u5B50",
+          "enabled": true
+        },
+        {
+          "id": "spore",
+          "label": "\u5F3A\u5316\u5B62\u5B50",
+          "enabled": true
+        },
+        {
+          "id": "evolution",
+          "label": "\u8FDB\u5316\u5B62\u5B50",
+          "enabled": true
+        },
+        {
+          "id": "unknown",
+          "label": "\u672A\u63A2\u660E\u8282\u70B9",
+          "enabled": true
+        }
+      ]
+    },
+    "origin": {
+      "teams": [
+        1
+      ],
+      "max_runs": 0,
+      "auto_settle": true
+    },
+    "arena": {
+      "teams": [
+        1
+      ],
+      "max_runs": 0,
+      "opponent": "power_gap",
+      "power_gap_min": 10000,
+      "power_gap_max": 20000,
+      "auto_settle": true
+    },
+    "nest": {
+      "teams": [],
+      "max_runs": 1,
+      "buff_priority": [
+        {
+          "id": "assist",
+          "label": "\u602A\u517D\u52A9\u6218",
+          "enabled": true
+        },
+        {
+          "id": "lifesteal",
+          "label": "\u5438\u8840",
+          "enabled": true
+        },
+        {
+          "id": "attack",
+          "label": "\u653B\u51FB\u529B",
+          "enabled": true
+        },
+        {
+          "id": "level",
+          "label": "\u8C1C\u4E4B\u602A\u517D\u7B49\u7EA7",
+          "enabled": true
+        },
+        {
+          "id": "damage",
+          "label": "\u4F24\u5BB3\u63D0\u5347",
+          "enabled": true
+        },
+        {
+          "id": "reduction",
+          "label": "\u51CF\u4F24",
+          "enabled": true
+        },
+        {
+          "id": "health",
+          "label": "\u751F\u547D\u4E0A\u9650",
+          "enabled": true
+        },
+        {
+          "id": "revive",
+          "label": "\u590D\u6D3B",
+          "enabled": true
+        },
+        {
+          "id": "dominance",
+          "label": "\u9738\u6C14",
+          "enabled": true
+        },
+        {
+          "id": "size",
+          "label": "\u4F53\u578B",
+          "enabled": true
+        },
+        {
+          "id": "speed",
+          "label": "\u79FB\u901F",
+          "enabled": true
+        },
+        {
+          "id": "heal",
+          "label": "\u751F\u547D\u6062\u590D",
+          "enabled": true
+        }
+      ]
+    },
+    "celebration": {
+      "triad": true,
+      "triad_auto_settle": true,
+      "giant": false,
+      "giant_teams": [
+        2,
+        1
+      ],
+      "giant_max_runs": 0,
+      "giant_skip_completed": true,
+      "giant_auto_settle": true,
+      "daily_puzzle": false
+    },
+    "rewards": {
+      "collect_idle": true,
+      "tabs": [
+        {
+          "id": "daily",
+          "label": "\u6BCF\u65E5\u6311\u6218",
+          "enabled": true
+        },
+        {
+          "id": "side",
+          "label": "\u652F\u7EBF\u5192\u9669",
+          "enabled": true
+        },
+        {
+          "id": "main",
+          "label": "\u4E3B\u7EBF\u4EFB\u52A1",
+          "enabled": true
+        }
+      ],
+      "max_batches": 1,
+      "world_echoes": [
+        {
+          "id": "monument",
+          "label": "\u4E16\u754C\u4E30\u7891",
+          "enabled": true
+        },
+        {
+          "id": "lost",
+          "label": "\u9057\u843D\u56DE\u54CD",
+          "enabled": true
+        },
+        {
+          "id": "torrent",
+          "label": "\u8D85\u661F\u6D2A\u6D41",
+          "enabled": true
+        },
+        {
+          "id": "notes",
+          "label": "\u5FAE\u5149\u7B14\u8BB0",
+          "enabled": true
+        }
+      ]
+    },
+    "other": {
+      "friend_management": false,
+      "exchange_friend_coins": true,
+      "remove_inactive_friends": true,
+      "inactive_days": 5,
+      "auto_add_friends": true,
+      "collect_daily_single": true,
+      "collect_plane_lord": false,
+      "collect_contract": true,
+      "piggy_bank": true,
+      "buy_star_spores": true,
+      "convert_star_souls": true,
+      "evolve_blue_for_star_souls": true,
+      "buy_blue_eggs_for_star_souls": true,
+      "buy_all_blue_eggs": true,
+      "star_egg_target": "\u505C\u987F",
+      "tribe_gold_donation": false,
+      "open_monster_boxes": true,
+      "monster_box_mode": "random",
+      "monster_box_target": "\u66B4\u9F99",
+      "monster_box_limit": 0,
+      "clear_bag_notifications": true,
+      "challenge_abyss": true
+    },
+    "finish": {
+      "close_mumu": false,
+      "close_app": false
+    }
+  },
+  "stamina_order": [
+    "copies",
+    "hunt",
+    "main"
+  ],
+  "schema_version": 8,
+  "stamina_settings": {
+    "auto_three_shots": true
+  },
+  "task_settings_selection": "rewards",
+  "follow_running_task": true,
+  "unordered_tasks": false,
+  "puzzle_max_games": 0,
+  "tour_options": {
+    "teams": [
+      1,
+      2
+    ],
+    "max_battles": 100
+  },
+  "puzzle_target_score": 7172,
+  "wild_capture": {
+    "young": {
+      "enabled": true,
+      "probability": 80
+    },
+    "phantom": {
+      "enabled": true,
+      "probability": 90
+    },
+    "ultimate": {
+      "enabled": true,
+      "probability": 80
+    },
+    "immortal": {
+      "enabled": true,
+      "probability": 100
+    },
+    "awakened": {
+      "enabled": true,
+      "probability": 100
+    }
+  },
+  "wild_capture_enabled": true,
+  "abyss_options": {
+    "teams": [
+      1,
+      2
+    ]
+  },
+  "merchant_options": {
+    "mode": "random",
+    "diamond_budget": 240,
+    "items": [
+      {
+        "id": "evolution",
+        "label": "\u8FDB\u5316\u5B62\u5B50",
+        "enabled": false
+      },
+      {
+        "id": "spore",
+        "label": "\u5F3A\u5316\u5B62\u5B50",
+        "enabled": false
+      },
+      {
+        "id": "divinity",
+        "label": "\u795E\u6027\u5B62\u5B50",
+        "enabled": false
+      },
+      {
+        "id": "realm",
+        "label": "\u9886\u57DF\u77F3",
+        "enabled": false
+      },
+      {
+        "id": "polarization",
+        "label": "\u6781\u5316\u77F3",
+        "enabled": false
+      },
+      {
+        "id": "gold",
+        "label": "\u91D1\u5E01",
+        "enabled": false
+      },
+      {
+        "id": "dust",
+        "label": "\u7C89\u5C18",
+        "enabled": false
+      },
+      {
+        "id": "lifesteal_core",
+        "label": "\u55DC\u8840\u00B7\u771F\u5B9E\u4F24\u5BB3\u5143\u6838",
+        "enabled": false
+      }
+    ]
+  },
+  "free_summon_enabled": false,
+  "task_order": [
+    "startup",
+    "origin",
+    "celebration",
+    "tower",
+    "cocoon",
+    "exploration",
+    "hunt",
+    "main",
+    "tribe",
+    "rift",
+    "forest",
+    "copies",
+    "arena",
+    "nest",
+    "other",
+    "rewards",
+    "finish"
+  ],
+  "task_queue": [
+    {
+      "id": "startup",
+      "key": "startup",
+      "name": "\u5F00\u59CB\u5524\u9192",
+      "enabled": true,
+      "options": {}
+    },
+    {
+      "id": "origin",
+      "key": "origin",
+      "name": "\u8D77\u6E90\u6BBF",
+      "enabled": true,
+      "options": {
+        "teams": [
+          1
+        ],
+        "max_runs": 0,
+        "auto_settle": true
+      }
+    },
+    {
+      "id": "giant",
+      "key": "celebration",
+      "name": "\u5E86\u5178\u6D3B\u52A8",
+      "enabled": true,
+      "options": {
+        "triad": true,
+        "triad_auto_settle": true,
+        "giant": false,
+        "giant_teams": [
+          2,
+          1
+        ],
+        "giant_max_runs": 0,
+        "giant_skip_completed": true,
+        "giant_auto_settle": true,
+        "daily_puzzle": false
+      }
+    },
+    {
+      "id": "tower",
+      "key": "tower",
+      "name": "\u6D6E\u7A7A\u5DE8\u5854",
+      "enabled": true,
+      "options": {
+        "teams": [],
+        "max_runs": 0,
+        "reserve_feathers": 0,
+        "towers": [
+          {
+            "id": "normal",
+            "label": "\u65E0\u9650\u5236",
+            "enabled": true
+          },
+          {
+            "id": "dragon",
+            "label": "\u7956\u9F99\u65CF",
+            "enabled": true
+          },
+          {
+            "id": "star",
+            "label": "\u661F\u7075\u65CF",
+            "enabled": true
+          },
+          {
+            "id": "ghost",
+            "label": "\u5C38\u9B3C\u65CF",
+            "enabled": true
+          },
+          {
+            "id": "native",
+            "label": "\u539F\u751F\u65CF",
+            "enabled": true
+          },
+          {
+            "id": "puppet",
+            "label": "\u6728\u5076\u65CF",
+            "enabled": true
+          }
+        ],
+        "secret_garden": true
+      }
+    },
+    {
+      "id": "cocoon",
+      "key": "cocoon",
+      "name": "\u6C38\u751F\u4E4B\u8327",
+      "enabled": true,
+      "options": {
+        "teams": [
+          1,
+          2
+        ],
+        "reserve_spikes_enabled": false,
+        "reserve_spikes": 1,
+        "daily_tasks": true,
+        "refresh_tasks": false,
+        "refresh_require_three_spikes": true,
+        "max_refreshes": 0,
+        "targets": [
+          {
+            "id": "divinity",
+            "label": "\u795E\u6027\u96C6\u5408",
+            "enabled": true
+          },
+          {
+            "id": "gold",
+            "label": "\u5BCC\u6709",
+            "enabled": true
+          },
+          {
+            "id": "summon",
+            "label": "\u9020\u5524\u68A6\u5883",
+            "enabled": true
+          },
+          {
+            "id": "evolution",
+            "label": "\u8FDB\u5316\u8BD5\u70BC",
+            "enabled": true
+          },
+          {
+            "id": "stone",
+            "label": "\u4E00\u5730\u539F\u77F3",
+            "enabled": true
+          },
+          {
+            "id": "spore",
+            "label": "\u5168\u4F53\u5F3A\u5316",
+            "enabled": true
+          },
+          {
+            "id": "wall",
+            "label": "\u5899\u6218",
+            "enabled": true
+          },
+          {
+            "id": "experience",
+            "label": "\u7ECF\u9A8C",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "exploration",
+      "key": "exploration",
+      "name": "\u63A2\u7D22",
+      "enabled": true,
+      "options": {}
+    },
+    {
+      "id": "hunt",
+      "key": "hunt",
+      "name": "\u72E9\u730E",
+      "enabled": true,
+      "options": {
+        "team": "1",
+        "auto_settle": true,
+        "use_search_tokens": true,
+        "max_searches": 0,
+        "auto_three_shots": true,
+        "auto_potions": false
+      }
+    },
+    {
+      "id": "main",
+      "key": "main",
+      "name": "\u4E3B\u7EBF\u5173\u5361",
+      "enabled": true,
+      "options": {
+        "teams": [
+          2,
+          1
+        ],
+        "max_runs": 0,
+        "max_nodes": 20,
+        "auto_three_shots": true,
+        "auto_potions": false
+      }
+    },
+    {
+      "id": "tribe",
+      "key": "tribe",
+      "name": "\u90E8\u843D\u5192\u9669",
+      "enabled": true,
+      "options": {
+        "teams": [
+          1
+        ],
+        "max_runs": 0,
+        "reserve_orders": 0,
+        "random_totem": true
+      }
+    },
+    {
+      "id": "rift",
+      "key": "rift",
+      "name": "\u51FF\u661F\u88C2\u75D5",
+      "enabled": true,
+      "options": {
+        "teams": [
+          2,
+          1
+        ],
+        "max_runs": 0,
+        "reserve_keys": 0
+      }
+    },
+    {
+      "id": "forest",
+      "key": "forest",
+      "name": "\u9ED1\u6697\u68EE\u6797",
+      "enabled": true,
+      "options": {
+        "teams": [
+          1,
+          2
+        ],
+        "max_runs": 0,
+        "mode": "simple",
+        "strategy": "overflow",
+        "reserve_points": 0,
+        "max_explorations": 0,
+        "collect_resources": true,
+        "node_priority": [
+          {
+            "id": "lamp",
+            "label": "\u68EE\u706F",
+            "enabled": true
+          },
+          {
+            "id": "beast",
+            "label": "\u51F6\u517D",
+            "enabled": true
+          },
+          {
+            "id": "spring",
+            "label": "\u547D\u8FD0\u4E4B\u6CC9",
+            "enabled": true
+          },
+          {
+            "id": "divinity",
+            "label": "\u795E\u6027\u5B62\u5B50",
+            "enabled": true
+          },
+          {
+            "id": "spore",
+            "label": "\u5F3A\u5316\u5B62\u5B50",
+            "enabled": true
+          },
+          {
+            "id": "evolution",
+            "label": "\u8FDB\u5316\u5B62\u5B50",
+            "enabled": true
+          },
+          {
+            "id": "unknown",
+            "label": "\u672A\u63A2\u660E\u8282\u70B9",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "copies",
+      "key": "copies",
+      "name": "\u5F02\u8C61",
+      "enabled": true,
+      "options": {
+        "challenge_copies": true,
+        "teams": [
+          1
+        ],
+        "max_runs": 0,
+        "include_friends": true,
+        "wandering_sage": true,
+        "sage_until_end": true,
+        "auto_three_shots": true,
+        "auto_potions": false
+      }
+    },
+    {
+      "id": "arena",
+      "key": "arena",
+      "name": "\u6597\u6280\u573A",
+      "enabled": true,
+      "options": {
+        "teams": [
+          1
+        ],
+        "max_runs": 0,
+        "opponent": "power_gap",
+        "power_gap_min": 10000,
+        "power_gap_max": 20000,
+        "auto_settle": true
+      }
+    },
+    {
+      "id": "nest",
+      "key": "nest",
+      "name": "\u8C1C\u4E4B\u5DE2\u7A74",
+      "enabled": true,
+      "options": {
+        "teams": [],
+        "max_runs": 1,
+        "buff_priority": [
+          {
+            "id": "assist",
+            "label": "\u602A\u517D\u52A9\u6218",
+            "enabled": true
+          },
+          {
+            "id": "lifesteal",
+            "label": "\u5438\u8840",
+            "enabled": true
+          },
+          {
+            "id": "attack",
+            "label": "\u653B\u51FB\u529B",
+            "enabled": true
+          },
+          {
+            "id": "level",
+            "label": "\u8C1C\u4E4B\u602A\u517D\u7B49\u7EA7",
+            "enabled": true
+          },
+          {
+            "id": "damage",
+            "label": "\u4F24\u5BB3\u63D0\u5347",
+            "enabled": true
+          },
+          {
+            "id": "reduction",
+            "label": "\u51CF\u4F24",
+            "enabled": true
+          },
+          {
+            "id": "health",
+            "label": "\u751F\u547D\u4E0A\u9650",
+            "enabled": true
+          },
+          {
+            "id": "revive",
+            "label": "\u590D\u6D3B",
+            "enabled": true
+          },
+          {
+            "id": "dominance",
+            "label": "\u9738\u6C14",
+            "enabled": true
+          },
+          {
+            "id": "size",
+            "label": "\u4F53\u578B",
+            "enabled": true
+          },
+          {
+            "id": "speed",
+            "label": "\u79FB\u901F",
+            "enabled": true
+          },
+          {
+            "id": "heal",
+            "label": "\u751F\u547D\u6062\u590D",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "other",
+      "key": "other",
+      "name": "\u5176\u4ED6\u4EFB\u52A1",
+      "enabled": true,
+      "options": {
+        "friend_management": false,
+        "exchange_friend_coins": true,
+        "remove_inactive_friends": true,
+        "inactive_days": 5,
+        "auto_add_friends": true,
+        "collect_daily_single": true,
+        "collect_plane_lord": false,
+        "collect_contract": true,
+        "piggy_bank": true,
+        "buy_star_spores": true,
+        "convert_star_souls": true,
+        "evolve_blue_for_star_souls": true,
+        "buy_blue_eggs_for_star_souls": true,
+        "buy_all_blue_eggs": true,
+        "star_egg_target": "\u505C\u987F",
+        "tribe_gold_donation": false,
+        "open_monster_boxes": true,
+        "monster_box_mode": "random",
+        "monster_box_target": "\u66B4\u9F99",
+        "monster_box_limit": 0,
+        "clear_bag_notifications": true,
+        "challenge_abyss": true
+      }
+    },
+    {
+      "id": "rewards",
+      "key": "rewards",
+      "name": "\u4EFB\u52A1\u9886\u5956",
+      "enabled": true,
+      "options": {
+        "collect_idle": true,
+        "tabs": [
+          {
+            "id": "daily",
+            "label": "\u6BCF\u65E5\u6311\u6218",
+            "enabled": true
+          },
+          {
+            "id": "side",
+            "label": "\u652F\u7EBF\u5192\u9669",
+            "enabled": true
+          },
+          {
+            "id": "main",
+            "label": "\u4E3B\u7EBF\u4EFB\u52A1",
+            "enabled": true
+          }
+        ],
+        "max_batches": 1,
+        "world_echoes": [
+          {
+            "id": "monument",
+            "label": "\u4E16\u754C\u4E30\u7891",
+            "enabled": true
+          },
+          {
+            "id": "lost",
+            "label": "\u9057\u843D\u56DE\u54CD",
+            "enabled": true
+          },
+          {
+            "id": "torrent",
+            "label": "\u8D85\u661F\u6D2A\u6D41",
+            "enabled": true
+          },
+          {
+            "id": "notes",
+            "label": "\u5FAE\u5149\u7B14\u8BB0",
+            "enabled": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "finish",
+      "key": "finish",
+      "name": "\u7ED3\u675F\u5173\u95ED",
+      "enabled": true,
+      "options": {
+        "close_mumu": false,
+        "close_app": false
+      }
+    }
+  ],
+  "allow_repeat_tasks": false,
+  "task_templates": [
+    {
+      "id": "2f834533fff04a9a9a6dfeba18044c4b",
+      "name": "\u6A21\u677F1",
+      "settings": {
+        "task_order": [
+          "startup",
+          "origin",
+          "celebration",
+          "tower",
+          "cocoon",
+          "exploration",
+          "hunt",
+          "main",
+          "tribe",
+          "rift",
+          "forest",
+          "copies",
+          "arena",
+          "nest",
+          "other",
+          "rewards",
+          "finish"
+        ],
+        "tasks": [
+          "startup",
+          "origin",
+          "celebration",
+          "tower",
+          "cocoon",
+          "exploration",
+          "hunt",
+          "main",
+          "tribe",
+          "rift",
+          "forest",
+          "copies",
+          "arena",
+          "nest",
+          "other",
+          "rewards",
+          "finish"
+        ],
+        "task_options": {
+          "startup": {},
+          "exploration": {},
+          "copies": {
+            "challenge_copies": true,
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "include_friends": true,
+            "wandering_sage": true,
+            "sage_until_end": true,
+            "auto_three_shots": true,
+            "auto_potions": false
+          },
+          "hunt": {
+            "team": "1",
+            "auto_settle": true,
+            "use_search_tokens": true,
+            "max_searches": 0,
+            "auto_three_shots": true,
+            "auto_potions": false
+          },
+          "main": {
+            "teams": [
+              2,
+              1
+            ],
+            "max_runs": 0,
+            "max_nodes": 20,
+            "auto_three_shots": true,
+            "auto_potions": false
+          },
+          "tower": {
+            "teams": [],
+            "max_runs": 0,
+            "reserve_feathers": 0,
+            "towers": [
+              {
+                "id": "normal",
+                "label": "\u65E0\u9650\u5236",
+                "enabled": true
+              },
+              {
+                "id": "dragon",
+                "label": "\u7956\u9F99\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "star",
+                "label": "\u661F\u7075\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "ghost",
+                "label": "\u5C38\u9B3C\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "native",
+                "label": "\u539F\u751F\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "puppet",
+                "label": "\u6728\u5076\u65CF",
+                "enabled": true
+              }
+            ],
+            "secret_garden": true
+          },
+          "cocoon": {
+            "teams": [
+              1,
+              2
+            ],
+            "reserve_spikes_enabled": false,
+            "reserve_spikes": 1,
+            "daily_tasks": true,
+            "refresh_tasks": false,
+            "refresh_require_three_spikes": true,
+            "max_refreshes": 0,
+            "targets": [
+              {
+                "id": "divinity",
+                "label": "\u795E\u6027\u96C6\u5408",
+                "enabled": true
+              },
+              {
+                "id": "gold",
+                "label": "\u5BCC\u6709",
+                "enabled": true
+              },
+              {
+                "id": "summon",
+                "label": "\u9020\u5524\u68A6\u5883",
+                "enabled": true
+              },
+              {
+                "id": "evolution",
+                "label": "\u8FDB\u5316\u8BD5\u70BC",
+                "enabled": true
+              },
+              {
+                "id": "stone",
+                "label": "\u4E00\u5730\u539F\u77F3",
+                "enabled": true
+              },
+              {
+                "id": "spore",
+                "label": "\u5168\u4F53\u5F3A\u5316",
+                "enabled": true
+              },
+              {
+                "id": "wall",
+                "label": "\u5899\u6218",
+                "enabled": true
+              },
+              {
+                "id": "experience",
+                "label": "\u7ECF\u9A8C",
+                "enabled": true
+              }
+            ]
+          },
+          "tribe": {
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "reserve_orders": 0,
+            "random_totem": true
+          },
+          "rift": {
+            "teams": [
+              2,
+              1
+            ],
+            "max_runs": 0,
+            "reserve_keys": 0
+          },
+          "forest": {
+            "teams": [
+              1,
+              2
+            ],
+            "max_runs": 0,
+            "mode": "simple",
+            "strategy": "overflow",
+            "reserve_points": 0,
+            "max_explorations": 0,
+            "collect_resources": true,
+            "node_priority": [
+              {
+                "id": "lamp",
+                "label": "\u68EE\u706F",
+                "enabled": true
+              },
+              {
+                "id": "beast",
+                "label": "\u51F6\u517D",
+                "enabled": true
+              },
+              {
+                "id": "spring",
+                "label": "\u547D\u8FD0\u4E4B\u6CC9",
+                "enabled": true
+              },
+              {
+                "id": "divinity",
+                "label": "\u795E\u6027\u5B62\u5B50",
+                "enabled": true
+              },
+              {
+                "id": "spore",
+                "label": "\u5F3A\u5316\u5B62\u5B50",
+                "enabled": true
+              },
+              {
+                "id": "evolution",
+                "label": "\u8FDB\u5316\u5B62\u5B50",
+                "enabled": true
+              },
+              {
+                "id": "unknown",
+                "label": "\u672A\u63A2\u660E\u8282\u70B9",
+                "enabled": true
+              }
+            ]
+          },
+          "origin": {
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "auto_settle": true
+          },
+          "arena": {
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "opponent": "power_gap",
+            "power_gap_min": 10000,
+            "power_gap_max": 20000,
+            "auto_settle": true
+          },
+          "nest": {
+            "teams": [],
+            "max_runs": 1,
+            "buff_priority": [
+              {
+                "id": "assist",
+                "label": "\u602A\u517D\u52A9\u6218",
+                "enabled": true
+              },
+              {
+                "id": "lifesteal",
+                "label": "\u5438\u8840",
+                "enabled": true
+              },
+              {
+                "id": "attack",
+                "label": "\u653B\u51FB\u529B",
+                "enabled": true
+              },
+              {
+                "id": "level",
+                "label": "\u8C1C\u4E4B\u602A\u517D\u7B49\u7EA7",
+                "enabled": true
+              },
+              {
+                "id": "damage",
+                "label": "\u4F24\u5BB3\u63D0\u5347",
+                "enabled": true
+              },
+              {
+                "id": "reduction",
+                "label": "\u51CF\u4F24",
+                "enabled": true
+              },
+              {
+                "id": "health",
+                "label": "\u751F\u547D\u4E0A\u9650",
+                "enabled": true
+              },
+              {
+                "id": "revive",
+                "label": "\u590D\u6D3B",
+                "enabled": true
+              },
+              {
+                "id": "dominance",
+                "label": "\u9738\u6C14",
+                "enabled": true
+              },
+              {
+                "id": "size",
+                "label": "\u4F53\u578B",
+                "enabled": true
+              },
+              {
+                "id": "speed",
+                "label": "\u79FB\u901F",
+                "enabled": true
+              },
+              {
+                "id": "heal",
+                "label": "\u751F\u547D\u6062\u590D",
+                "enabled": true
+              }
+            ]
+          },
+          "celebration": {
+            "triad": true,
+            "triad_auto_settle": true,
+            "giant": false,
+            "giant_teams": [
+              2,
+              1
+            ],
+            "giant_max_runs": 0,
+            "giant_skip_completed": true,
+            "giant_auto_settle": true,
+            "daily_puzzle": false
+          },
+          "rewards": {
+            "collect_idle": true,
+            "tabs": [
+              {
+                "id": "daily",
+                "label": "\u6BCF\u65E5\u6311\u6218",
+                "enabled": true
+              },
+              {
+                "id": "side",
+                "label": "\u652F\u7EBF\u5192\u9669",
+                "enabled": true
+              },
+              {
+                "id": "main",
+                "label": "\u4E3B\u7EBF\u4EFB\u52A1",
+                "enabled": true
+              }
+            ],
+            "max_batches": 1,
+            "world_echoes": [
+              {
+                "id": "monument",
+                "label": "\u4E16\u754C\u4E30\u7891",
+                "enabled": true
+              },
+              {
+                "id": "lost",
+                "label": "\u9057\u843D\u56DE\u54CD",
+                "enabled": true
+              },
+              {
+                "id": "torrent",
+                "label": "\u8D85\u661F\u6D2A\u6D41",
+                "enabled": true
+              },
+              {
+                "id": "notes",
+                "label": "\u5FAE\u5149\u7B14\u8BB0",
+                "enabled": true
+              }
+            ]
+          },
+          "other": {
+            "friend_management": false,
+            "exchange_friend_coins": true,
+            "remove_inactive_friends": true,
+            "inactive_days": 5,
+            "auto_add_friends": true,
+            "collect_daily_single": true,
+            "collect_plane_lord": false,
+            "collect_contract": true,
+            "piggy_bank": true,
+            "buy_star_spores": true,
+            "convert_star_souls": true,
+            "evolve_blue_for_star_souls": true,
+            "buy_blue_eggs_for_star_souls": true,
+            "buy_all_blue_eggs": true,
+            "star_egg_target": "\u505C\u987F",
+            "tribe_gold_donation": false,
+            "open_monster_boxes": true,
+            "monster_box_mode": "random",
+            "monster_box_target": "\u66B4\u9F99",
+            "monster_box_limit": 0,
+            "clear_bag_notifications": true,
+            "challenge_abyss": true
+          },
+          "finish": {
+            "close_mumu": false,
+            "close_app": false
+          }
+        },
+        "task_queue": [
+          {
+            "id": "startup",
+            "key": "startup",
+            "name": "\u5F00\u59CB\u5524\u9192",
+            "enabled": true,
+            "options": {}
+          },
+          {
+            "id": "origin",
+            "key": "origin",
+            "name": "\u8D77\u6E90\u6BBF",
+            "enabled": true,
+            "options": {
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "auto_settle": true
+            }
+          },
+          {
+            "id": "giant",
+            "key": "celebration",
+            "name": "\u5E86\u5178\u6D3B\u52A8",
+            "enabled": true,
+            "options": {
+              "triad": true,
+              "triad_auto_settle": true,
+              "giant": false,
+              "giant_teams": [
+                2,
+                1
+              ],
+              "giant_max_runs": 0,
+              "giant_skip_completed": true,
+              "giant_auto_settle": true,
+              "daily_puzzle": false
+            }
+          },
+          {
+            "id": "tower",
+            "key": "tower",
+            "name": "\u6D6E\u7A7A\u5DE8\u5854",
+            "enabled": true,
+            "options": {
+              "teams": [],
+              "max_runs": 0,
+              "reserve_feathers": 0,
+              "towers": [
+                {
+                  "id": "normal",
+                  "label": "\u65E0\u9650\u5236",
+                  "enabled": true
+                },
+                {
+                  "id": "dragon",
+                  "label": "\u7956\u9F99\u65CF",
+                  "enabled": true
+                },
+                {
+                  "id": "star",
+                  "label": "\u661F\u7075\u65CF",
+                  "enabled": true
+                },
+                {
+                  "id": "ghost",
+                  "label": "\u5C38\u9B3C\u65CF",
+                  "enabled": true
+                },
+                {
+                  "id": "native",
+                  "label": "\u539F\u751F\u65CF",
+                  "enabled": true
+                },
+                {
+                  "id": "puppet",
+                  "label": "\u6728\u5076\u65CF",
+                  "enabled": true
+                }
+              ],
+              "secret_garden": true
+            }
+          },
+          {
+            "id": "cocoon",
+            "key": "cocoon",
+            "name": "\u6C38\u751F\u4E4B\u8327",
+            "enabled": true,
+            "options": {
+              "teams": [
+                1,
+                2
+              ],
+              "reserve_spikes_enabled": false,
+              "reserve_spikes": 1,
+              "daily_tasks": true,
+              "refresh_tasks": false,
+              "refresh_require_three_spikes": true,
+              "max_refreshes": 0,
+              "targets": [
+                {
+                  "id": "divinity",
+                  "label": "\u795E\u6027\u96C6\u5408",
+                  "enabled": true
+                },
+                {
+                  "id": "gold",
+                  "label": "\u5BCC\u6709",
+                  "enabled": true
+                },
+                {
+                  "id": "summon",
+                  "label": "\u9020\u5524\u68A6\u5883",
+                  "enabled": true
+                },
+                {
+                  "id": "evolution",
+                  "label": "\u8FDB\u5316\u8BD5\u70BC",
+                  "enabled": true
+                },
+                {
+                  "id": "stone",
+                  "label": "\u4E00\u5730\u539F\u77F3",
+                  "enabled": true
+                },
+                {
+                  "id": "spore",
+                  "label": "\u5168\u4F53\u5F3A\u5316",
+                  "enabled": true
+                },
+                {
+                  "id": "wall",
+                  "label": "\u5899\u6218",
+                  "enabled": true
+                },
+                {
+                  "id": "experience",
+                  "label": "\u7ECF\u9A8C",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "exploration",
+            "key": "exploration",
+            "name": "\u63A2\u7D22",
+            "enabled": true,
+            "options": {}
+          },
+          {
+            "id": "hunt",
+            "key": "hunt",
+            "name": "\u72E9\u730E",
+            "enabled": true,
+            "options": {
+              "team": "1",
+              "auto_settle": true,
+              "use_search_tokens": true,
+              "max_searches": 0,
+              "auto_three_shots": true,
+              "auto_potions": false
+            }
+          },
+          {
+            "id": "main",
+            "key": "main",
+            "name": "\u4E3B\u7EBF\u5173\u5361",
+            "enabled": true,
+            "options": {
+              "teams": [
+                2,
+                1
+              ],
+              "max_runs": 0,
+              "max_nodes": 20,
+              "auto_three_shots": true,
+              "auto_potions": false
+            }
+          },
+          {
+            "id": "tribe",
+            "key": "tribe",
+            "name": "\u90E8\u843D\u5192\u9669",
+            "enabled": true,
+            "options": {
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "reserve_orders": 0,
+              "random_totem": true
+            }
+          },
+          {
+            "id": "rift",
+            "key": "rift",
+            "name": "\u51FF\u661F\u88C2\u75D5",
+            "enabled": true,
+            "options": {
+              "teams": [
+                2,
+                1
+              ],
+              "max_runs": 0,
+              "reserve_keys": 0
+            }
+          },
+          {
+            "id": "forest",
+            "key": "forest",
+            "name": "\u9ED1\u6697\u68EE\u6797",
+            "enabled": true,
+            "options": {
+              "teams": [
+                1,
+                2
+              ],
+              "max_runs": 0,
+              "mode": "simple",
+              "strategy": "overflow",
+              "reserve_points": 0,
+              "max_explorations": 0,
+              "collect_resources": true,
+              "node_priority": [
+                {
+                  "id": "lamp",
+                  "label": "\u68EE\u706F",
+                  "enabled": true
+                },
+                {
+                  "id": "beast",
+                  "label": "\u51F6\u517D",
+                  "enabled": true
+                },
+                {
+                  "id": "spring",
+                  "label": "\u547D\u8FD0\u4E4B\u6CC9",
+                  "enabled": true
+                },
+                {
+                  "id": "divinity",
+                  "label": "\u795E\u6027\u5B62\u5B50",
+                  "enabled": true
+                },
+                {
+                  "id": "spore",
+                  "label": "\u5F3A\u5316\u5B62\u5B50",
+                  "enabled": true
+                },
+                {
+                  "id": "evolution",
+                  "label": "\u8FDB\u5316\u5B62\u5B50",
+                  "enabled": true
+                },
+                {
+                  "id": "unknown",
+                  "label": "\u672A\u63A2\u660E\u8282\u70B9",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "copies",
+            "key": "copies",
+            "name": "\u5F02\u8C61",
+            "enabled": true,
+            "options": {
+              "challenge_copies": true,
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "include_friends": true,
+              "wandering_sage": true,
+              "sage_until_end": true,
+              "auto_three_shots": true,
+              "auto_potions": false
+            }
+          },
+          {
+            "id": "arena",
+            "key": "arena",
+            "name": "\u6597\u6280\u573A",
+            "enabled": true,
+            "options": {
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "opponent": "power_gap",
+              "power_gap_min": 10000,
+              "power_gap_max": 20000,
+              "auto_settle": true
+            }
+          },
+          {
+            "id": "nest",
+            "key": "nest",
+            "name": "\u8C1C\u4E4B\u5DE2\u7A74",
+            "enabled": true,
+            "options": {
+              "teams": [],
+              "max_runs": 1,
+              "buff_priority": [
+                {
+                  "id": "assist",
+                  "label": "\u602A\u517D\u52A9\u6218",
+                  "enabled": true
+                },
+                {
+                  "id": "lifesteal",
+                  "label": "\u5438\u8840",
+                  "enabled": true
+                },
+                {
+                  "id": "attack",
+                  "label": "\u653B\u51FB\u529B",
+                  "enabled": true
+                },
+                {
+                  "id": "level",
+                  "label": "\u8C1C\u4E4B\u602A\u517D\u7B49\u7EA7",
+                  "enabled": true
+                },
+                {
+                  "id": "damage",
+                  "label": "\u4F24\u5BB3\u63D0\u5347",
+                  "enabled": true
+                },
+                {
+                  "id": "reduction",
+                  "label": "\u51CF\u4F24",
+                  "enabled": true
+                },
+                {
+                  "id": "health",
+                  "label": "\u751F\u547D\u4E0A\u9650",
+                  "enabled": true
+                },
+                {
+                  "id": "revive",
+                  "label": "\u590D\u6D3B",
+                  "enabled": true
+                },
+                {
+                  "id": "dominance",
+                  "label": "\u9738\u6C14",
+                  "enabled": true
+                },
+                {
+                  "id": "size",
+                  "label": "\u4F53\u578B",
+                  "enabled": true
+                },
+                {
+                  "id": "speed",
+                  "label": "\u79FB\u901F",
+                  "enabled": true
+                },
+                {
+                  "id": "heal",
+                  "label": "\u751F\u547D\u6062\u590D",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "other",
+            "key": "other",
+            "name": "\u5176\u4ED6\u4EFB\u52A1",
+            "enabled": true,
+            "options": {
+              "friend_management": false,
+              "exchange_friend_coins": true,
+              "remove_inactive_friends": true,
+              "inactive_days": 5,
+              "auto_add_friends": true,
+              "collect_daily_single": true,
+              "collect_plane_lord": false,
+              "collect_contract": true,
+              "piggy_bank": true,
+              "buy_star_spores": true,
+              "convert_star_souls": true,
+              "evolve_blue_for_star_souls": true,
+              "buy_blue_eggs_for_star_souls": true,
+              "buy_all_blue_eggs": true,
+              "star_egg_target": "\u505C\u987F",
+              "tribe_gold_donation": false,
+              "open_monster_boxes": true,
+              "monster_box_mode": "random",
+              "monster_box_target": "\u66B4\u9F99",
+              "monster_box_limit": 0,
+              "clear_bag_notifications": true,
+              "challenge_abyss": true
+            }
+          },
+          {
+            "id": "rewards",
+            "key": "rewards",
+            "name": "\u4EFB\u52A1\u9886\u5956",
+            "enabled": true,
+            "options": {
+              "collect_idle": true,
+              "tabs": [
+                {
+                  "id": "daily",
+                  "label": "\u6BCF\u65E5\u6311\u6218",
+                  "enabled": true
+                },
+                {
+                  "id": "side",
+                  "label": "\u652F\u7EBF\u5192\u9669",
+                  "enabled": true
+                },
+                {
+                  "id": "main",
+                  "label": "\u4E3B\u7EBF\u4EFB\u52A1",
+                  "enabled": true
+                }
+              ],
+              "max_batches": 1,
+              "world_echoes": [
+                {
+                  "id": "monument",
+                  "label": "\u4E16\u754C\u4E30\u7891",
+                  "enabled": true
+                },
+                {
+                  "id": "lost",
+                  "label": "\u9057\u843D\u56DE\u54CD",
+                  "enabled": true
+                },
+                {
+                  "id": "torrent",
+                  "label": "\u8D85\u661F\u6D2A\u6D41",
+                  "enabled": true
+                },
+                {
+                  "id": "notes",
+                  "label": "\u5FAE\u5149\u7B14\u8BB0",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "finish",
+            "key": "finish",
+            "name": "\u7ED3\u675F\u5173\u95ED",
+            "enabled": true,
+            "options": {
+              "close_mumu": false,
+              "close_app": false
+            }
+          }
+        ],
+        "allow_repeat_tasks": false,
+        "stamina_order": [
+          "copies",
+          "hunt",
+          "main"
+        ],
+        "close_mumu": false,
+        "unordered_tasks": false,
+        "task_settings_selection": "rewards"
+      }
+    },
+    {
+      "id": "1aa57a6886ac4b64b90c9a7d61974dc4",
+      "name": "\u6A21\u677F2",
+      "settings": {
+        "task_order": [
+          "startup",
+          "copies",
+          "hunt",
+          "origin",
+          "arena",
+          "nest",
+          "celebration",
+          "rift",
+          "tribe",
+          "finish"
+        ],
+        "tasks": [
+          "origin",
+          "celebration"
+        ],
+        "task_options": {
+          "startup": {},
+          "exploration": {},
+          "copies": {
+            "challenge_copies": true,
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "include_friends": true,
+            "wandering_sage": true,
+            "auto_three_shots": true,
+            "auto_potions": false
+          },
+          "hunt": {
+            "team": "1",
+            "auto_settle": true,
+            "use_search_tokens": true,
+            "max_searches": 0,
+            "auto_three_shots": true,
+            "auto_potions": false
+          },
+          "main": {
+            "teams": [
+              2,
+              1
+            ],
+            "max_runs": 0,
+            "max_nodes": 20,
+            "auto_three_shots": true,
+            "auto_potions": false
+          },
+          "tower": {
+            "teams": [],
+            "max_runs": 0,
+            "reserve_feathers": 0,
+            "towers": [
+              {
+                "id": "normal",
+                "label": "\u65E0\u9650\u5236",
+                "enabled": true
+              },
+              {
+                "id": "dragon",
+                "label": "\u7956\u9F99\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "star",
+                "label": "\u661F\u7075\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "ghost",
+                "label": "\u5C38\u9B3C\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "native",
+                "label": "\u539F\u751F\u65CF",
+                "enabled": true
+              },
+              {
+                "id": "puppet",
+                "label": "\u6728\u5076\u65CF",
+                "enabled": true
+              }
+            ],
+            "secret_garden": true
+          },
+          "cocoon": {
+            "teams": [
+              1,
+              2
+            ],
+            "reserve_spikes": 1,
+            "daily_tasks": true,
+            "refresh_tasks": false,
+            "refresh_require_three_spikes": true,
+            "max_refreshes": 0,
+            "targets": [
+              {
+                "id": "summon",
+                "label": "\u9020\u5524\u68A6\u5883",
+                "enabled": true
+              },
+              {
+                "id": "divinity",
+                "label": "\u795E\u6027\u96C6\u5408",
+                "enabled": true
+              },
+              {
+                "id": "spore",
+                "label": "\u5168\u4F53\u5F3A\u5316",
+                "enabled": true
+              },
+              {
+                "id": "evolution",
+                "label": "\u8FDB\u5316\u8BD5\u70BC",
+                "enabled": true
+              },
+              {
+                "id": "wall",
+                "label": "\u5899\u6218",
+                "enabled": true
+              }
+            ],
+            "reserve_spikes_enabled": false
+          },
+          "tribe": {
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "reserve_orders": 0
+          },
+          "rift": {
+            "teams": [
+              2,
+              1
+            ],
+            "max_runs": 0,
+            "reserve_keys": 0
+          },
+          "forest": {
+            "teams": [
+              2
+            ],
+            "max_runs": 0,
+            "strategy": "overflow",
+            "reserve_points": 0,
+            "max_explorations": 0,
+            "collect_resources": true,
+            "node_priority": [
+              {
+                "id": "lamp",
+                "label": "\u68EE\u706F",
+                "enabled": true
+              },
+              {
+                "id": "beast",
+                "label": "\u51F6\u517D",
+                "enabled": true
+              },
+              {
+                "id": "spring",
+                "label": "\u547D\u8FD0\u4E4B\u6CC9",
+                "enabled": true
+              },
+              {
+                "id": "divinity",
+                "label": "\u795E\u6027\u5B62\u5B50",
+                "enabled": true
+              },
+              {
+                "id": "spore",
+                "label": "\u5F3A\u5316\u5B62\u5B50",
+                "enabled": true
+              },
+              {
+                "id": "evolution",
+                "label": "\u8FDB\u5316\u5B62\u5B50",
+                "enabled": true
+              },
+              {
+                "id": "unknown",
+                "label": "\u672A\u63A2\u660E\u8282\u70B9",
+                "enabled": true
+              }
+            ]
+          },
+          "origin": {
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "auto_settle": true
+          },
+          "arena": {
+            "teams": [
+              1
+            ],
+            "max_runs": 0,
+            "opponent": "weakest",
+            "auto_settle": true
+          },
+          "nest": {
+            "teams": [],
+            "max_runs": 1,
+            "buff_priority": [
+              {
+                "id": "assist",
+                "label": "\u602A\u517D\u52A9\u6218",
+                "enabled": true
+              },
+              {
+                "id": "lifesteal",
+                "label": "\u5438\u8840",
+                "enabled": true
+              },
+              {
+                "id": "attack",
+                "label": "\u653B\u51FB\u529B",
+                "enabled": true
+              },
+              {
+                "id": "level",
+                "label": "\u8C1C\u4E4B\u602A\u517D\u7B49\u7EA7",
+                "enabled": true
+              },
+              {
+                "id": "damage",
+                "label": "\u4F24\u5BB3\u63D0\u5347",
+                "enabled": true
+              },
+              {
+                "id": "reduction",
+                "label": "\u51CF\u4F24",
+                "enabled": true
+              },
+              {
+                "id": "health",
+                "label": "\u751F\u547D\u4E0A\u9650",
+                "enabled": true
+              },
+              {
+                "id": "revive",
+                "label": "\u590D\u6D3B",
+                "enabled": true
+              },
+              {
+                "id": "dominance",
+                "label": "\u9738\u6C14",
+                "enabled": true
+              },
+              {
+                "id": "size",
+                "label": "\u4F53\u578B",
+                "enabled": true
+              },
+              {
+                "id": "speed",
+                "label": "\u79FB\u901F",
+                "enabled": true
+              },
+              {
+                "id": "heal",
+                "label": "\u751F\u547D\u6062\u590D",
+                "enabled": true
+              }
+            ]
+          },
+          "giant": {
+            "teams": [
+              2,
+              1
+            ],
+            "max_runs": 0,
+            "skip_completed": true,
+            "auto_settle": true
+          },
+          "rewards": {
+            "collect_idle": true,
+            "tabs": [
+              {
+                "id": "daily",
+                "label": "\u6BCF\u65E5\u6311\u6218",
+                "enabled": true
+              },
+              {
+                "id": "side",
+                "label": "\u652F\u7EBF\u5192\u9669",
+                "enabled": true
+              },
+              {
+                "id": "main",
+                "label": "\u4E3B\u7EBF\u4EFB\u52A1",
+                "enabled": true
+              }
+            ],
+            "max_batches": 1,
+            "world_echoes": [
+              {
+                "id": "monument",
+                "label": "\u4E16\u754C\u4E30\u7891",
+                "enabled": true
+              },
+              {
+                "id": "lost",
+                "label": "\u9057\u843D\u56DE\u54CD",
+                "enabled": true
+              },
+              {
+                "id": "torrent",
+                "label": "\u8D85\u661F\u6D2A\u6D41",
+                "enabled": true
+              },
+              {
+                "id": "notes",
+                "label": "\u5FAE\u5149\u7B14\u8BB0",
+                "enabled": true
+              }
+            ]
+          },
+          "other": {
+            "friend_management": false,
+            "exchange_friend_coins": true,
+            "remove_inactive_friends": true,
+            "inactive_days": 5,
+            "auto_add_friends": true,
+            "collect_daily_single": true,
+            "collect_plane_lord": true,
+            "collect_contract": true,
+            "buy_star_spores": true,
+            "convert_star_souls": false,
+            "tribe_gold_donation": false,
+            "open_monster_boxes": false,
+            "monster_box_mode": "balanced",
+            "monster_box_target": "\u66B4\u9F99",
+            "monster_box_limit": 0,
+            "clear_bag_notifications": true
+          },
+          "finish": {
+            "close_mumu": true,
+            "close_app": true
+          },
+          "triad": {},
+          "celebration": {
+            "triad": true,
+            "giant": false,
+            "daily_puzzle": false,
+            "triad_auto_settle": true,
+            "giant_auto_settle": true,
+            "giant_skip_completed": true,
+            "giant_teams": [
+              2,
+              1
+            ],
+            "giant_max_runs": 0
+          }
+        },
+        "task_queue": [
+          {
+            "id": "startup",
+            "key": "startup",
+            "name": "\u5F00\u59CB\u5524\u9192",
+            "enabled": false,
+            "options": {}
+          },
+          {
+            "id": "copies",
+            "key": "copies",
+            "name": "\u5F02\u8C61",
+            "enabled": false,
+            "options": {
+              "challenge_copies": true,
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "include_friends": true,
+              "wandering_sage": true,
+              "auto_three_shots": true,
+              "auto_potions": false
+            }
+          },
+          {
+            "id": "hunt",
+            "key": "hunt",
+            "name": "\u72E9\u730E",
+            "enabled": false,
+            "options": {
+              "team": "1",
+              "auto_settle": true,
+              "use_search_tokens": true,
+              "max_searches": 0,
+              "auto_three_shots": true,
+              "auto_potions": false
+            }
+          },
+          {
+            "id": "origin",
+            "key": "origin",
+            "name": "\u8D77\u6E90\u6BBF",
+            "enabled": true,
+            "options": {
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "auto_settle": true
+            }
+          },
+          {
+            "id": "arena",
+            "key": "arena",
+            "name": "\u6597\u6280\u573A",
+            "enabled": false,
+            "options": {
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "opponent": "weakest",
+              "auto_settle": true
+            }
+          },
+          {
+            "id": "nest",
+            "key": "nest",
+            "name": "\u8C1C\u4E4B\u5DE2\u7A74",
+            "enabled": false,
+            "options": {
+              "teams": [],
+              "max_runs": 1,
+              "buff_priority": [
+                {
+                  "id": "assist",
+                  "label": "\u602A\u517D\u52A9\u6218",
+                  "enabled": true
+                },
+                {
+                  "id": "lifesteal",
+                  "label": "\u5438\u8840",
+                  "enabled": true
+                },
+                {
+                  "id": "attack",
+                  "label": "\u653B\u51FB\u529B",
+                  "enabled": true
+                },
+                {
+                  "id": "level",
+                  "label": "\u8C1C\u4E4B\u602A\u517D\u7B49\u7EA7",
+                  "enabled": true
+                },
+                {
+                  "id": "damage",
+                  "label": "\u4F24\u5BB3\u63D0\u5347",
+                  "enabled": true
+                },
+                {
+                  "id": "reduction",
+                  "label": "\u51CF\u4F24",
+                  "enabled": true
+                },
+                {
+                  "id": "health",
+                  "label": "\u751F\u547D\u4E0A\u9650",
+                  "enabled": true
+                },
+                {
+                  "id": "revive",
+                  "label": "\u590D\u6D3B",
+                  "enabled": true
+                },
+                {
+                  "id": "dominance",
+                  "label": "\u9738\u6C14",
+                  "enabled": true
+                },
+                {
+                  "id": "size",
+                  "label": "\u4F53\u578B",
+                  "enabled": true
+                },
+                {
+                  "id": "speed",
+                  "label": "\u79FB\u901F",
+                  "enabled": true
+                },
+                {
+                  "id": "heal",
+                  "label": "\u751F\u547D\u6062\u590D",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          {
+            "id": "giant",
+            "key": "celebration",
+            "name": "\u5E86\u5178\u6D3B\u52A8",
+            "enabled": true,
+            "options": {
+              "triad": true,
+              "giant": false,
+              "daily_puzzle": false,
+              "triad_auto_settle": true,
+              "giant_auto_settle": true,
+              "giant_skip_completed": true,
+              "giant_teams": [
+                2,
+                1
+              ],
+              "giant_max_runs": 0
+            }
+          },
+          {
+            "id": "rift",
+            "key": "rift",
+            "name": "\u51FF\u661F\u88C2\u75D5",
+            "enabled": false,
+            "options": {
+              "teams": [
+                2,
+                1
+              ],
+              "max_runs": 0,
+              "reserve_keys": 0
+            }
+          },
+          {
+            "id": "tribe",
+            "key": "tribe",
+            "name": "\u90E8\u843D\u5192\u9669",
+            "enabled": false,
+            "options": {
+              "teams": [
+                1
+              ],
+              "max_runs": 0,
+              "reserve_orders": 0
+            }
+          },
+          {
+            "id": "finish",
+            "key": "finish",
+            "name": "\u7ED3\u675F\u5173\u95ED",
+            "enabled": false,
+            "options": {
+              "close_mumu": true,
+              "close_app": true
+            }
+          }
+        ],
+        "allow_repeat_tasks": false,
+        "stamina_order": [
+          "copies",
+          "hunt",
+          "main"
+        ],
+        "close_mumu": false,
+        "unordered_tasks": false,
+        "task_settings_selection": "origin"
+      }
+    }
+  ],
+  "active_task_template": "2f834533fff04a9a9a6dfeba18044c4b",
+  "next_task_template_number": 3,
+  "trigger_events": {
+    "merchant": true,
+    "sage_quiz": true,
+    "star_gift": true,
+    "rift_invitation": true
+  }
+}

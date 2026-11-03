@@ -1,0 +1,33 @@
+<!-- Adapted from MAA Res/Styles/ComboBox.xaml and TextBox.xaml (AGPL-3.0).
+     Same HandyControls templates; omit MAA clipboard services and editable-caret code. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:hc="https://handyorg.github.io/handycontrol">
+ <Style TargetType="ComboBox" BasedOn="{StaticResource ComboBoxExtend}">
+  <Setter Property="Background" Value="{DynamicResource RegionBrushOpacity25}" />
+ </Style>
+ <Style TargetType="TextBox" BasedOn="{StaticResource TextBoxExtend}">
+  <Setter Property="Background" Value="{DynamicResource RegionBrushOpacity25}" />
+ </Style>
+ <Style x:Key="PlanList" TargetType="ListBox" BasedOn="{StaticResource NoSelectedHighlightListBoxStyle}">
+  <Setter Property="Background" Value="Transparent" />
+  <Setter Property="BorderThickness" Value="0" />
+  <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+  <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+  <Setter Property="ItemContainerStyle">
+   <Setter.Value><Style TargetType="ListBoxItem" BasedOn="{StaticResource NoSelectedHighlightListBoxItemStyle}">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+   </Style></Setter.Value>
+  </Setter>
+ </Style>
+ <Style x:Key="PlanIcon" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+  <Setter Property="Background" Value="Transparent" />
+  <Setter Property="BorderThickness" Value="0" />
+  <Setter Property="Width" Value="26" />
+  <Setter Property="Height" Value="30" />
+  <Setter Property="Padding" Value="5" />
+  <Setter Property="Foreground" Value="{DynamicResource SecondaryTextBrush}" />
+  <Setter Property="hc:VisualElement.HighlightBackground" Value="Transparent" />
+  <Setter Property="hc:VisualElement.HighlightForeground" Value="{DynamicResource PrimaryBrush}" />
+ </Style>
+</ResourceDictionary>

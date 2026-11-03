@@ -1,0 +1,1337 @@
+[
+  {
+    "key": "startup",
+    "name": "开始唤醒",
+    "description": "点击进入游戏；已有战斗先等结算，再继续所选任务",
+    "settings": {
+      "default_enabled": true,
+      "hint": "在开始界面点击“进入游戏”。游戏内自动返回任务入口；已有战斗先等本场结算，再按所选顺序执行任务。",
+      "fields": []
+    }
+  },
+  {
+    "key": "exploration",
+    "name": "探索",
+    "description": "全部领取并开始探索，必要时一键指派怪兽",
+    "settings": {
+      "hint": "全部领取已完成的探索，再开始探索；需要时一键指派怪兽。",
+      "fields": []
+    }
+  },
+  {
+    "key": "copies",
+    "name": "异象",
+    "description": "复制体挑战与游荡智者答题领奖，可分别开启",
+    "settings": {
+      "mode": "clear",
+      "fields": [
+        {
+          "key": "challenge_copies",
+          "type": "bool",
+          "label": "复制体",
+          "default": true
+        },
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [],
+          "min": 1,
+          "max": 5,
+          "enabled_when": "challenge_copies",
+          "indent": 18
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100,
+          "enabled_when": "challenge_copies",
+          "indent": 18
+        },
+        {
+          "key": "include_friends",
+          "type": "bool",
+          "label": "挑战可获得好友币的复制体",
+          "default": false,
+          "enabled_when": "challenge_copies",
+          "indent": 18
+        },
+        {
+          "key": "wandering_sage",
+          "type": "bool",
+          "label": "游荡智者",
+          "default": true
+        },
+        {
+          "key": "sage_until_end",
+          "type": "bool",
+          "label": "持续点击直到智者结束",
+          "default": true,
+          "enabled_when": "wandering_sage",
+          "indent": 18,
+          "description": "未收录的题目也选择选项，答错后继续对话、领取奖励，确认返回地图后结束。"
+        },
+        {
+          "key": "auto_three_shots",
+          "type": "bool",
+          "label": "体力不足时自动领取每日三发",
+          "default": true
+        },
+        {
+          "key": "auto_potions",
+          "type": "bool",
+          "label": "自动使用背包移动力药水",
+          "default": false
+        }
+      ]
+    }
+  },
+  {
+    "key": "hunt",
+    "name": "狩猎",
+    "description": "搜索前备足整批30体力，按设置先领三发或使用药水；限时猎物连续挑战完毕",
+    "settings": {
+      "mode": "clear",
+      "fields": [
+        {
+          "key": "team",
+          "type": "choice",
+          "label": "使用队伍",
+          "choices": [
+            {
+              "id": "1",
+              "label": "队伍 1"
+            },
+            {
+              "id": "2",
+              "label": "队伍 2"
+            },
+            {
+              "id": "3",
+              "label": "队伍 3"
+            },
+            {
+              "id": "4",
+              "label": "队伍 4"
+            },
+            {
+              "id": "5",
+              "label": "队伍 5"
+            }
+          ],
+          "default": "2"
+        },
+        {
+          "key": "auto_settle",
+          "type": "bool",
+          "label": "自动点击结算",
+          "default": true
+        },
+        {
+          "key": "use_search_tokens",
+          "type": "bool",
+          "label": "使用库存搜索令",
+          "default": true
+        },
+        {
+          "key": "max_searches",
+          "type": "number",
+          "label": "最多搜索次数（0为不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "auto_three_shots",
+          "type": "bool",
+          "label": "体力不足时自动领取每日三发",
+          "default": true
+        },
+        {
+          "key": "auto_potions",
+          "type": "bool",
+          "label": "自动使用背包移动力药水",
+          "default": false
+        }
+      ]
+    }
+  },
+  {
+    "key": "main",
+    "name": "主线关卡",
+    "description": "按阵容顺序闯关；全部失败后换关卡",
+    "settings": {
+      "mode": "clear",
+      "hint": "按列表顺序尝试，通关后前进；全部失败再换关。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            1,
+            2,
+            3
+          ],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "max_nodes",
+          "type": "number",
+          "label": "最多查找关卡（0为不限）",
+          "default": 20,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "auto_three_shots",
+          "type": "bool",
+          "label": "体力不足时自动领取每日三发",
+          "default": true
+        },
+        {
+          "key": "auto_potions",
+          "type": "bool",
+          "label": "自动使用背包移动力药水",
+          "default": false
+        }
+      ]
+    }
+  },
+  {
+    "key": "tower",
+    "name": "浮空巨塔",
+    "description": "连续挑战下一关；当前塔层失败后先挑战该塔秘庭，再前往下一座塔。羽毛由所有塔共用",
+    "settings": {
+      "mode": "clear",
+      "hint": "按列表顺序尝试，通关后前进；全部失败再换关。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "reserve_feathers",
+          "type": "number",
+          "label": "保留羽毛（0为用完）",
+          "default": 0,
+          "min": 0,
+          "max": 9999,
+          "advanced": false
+        },
+        {
+          "key": "towers",
+          "type": "stages",
+          "label": "挑战的塔",
+          "counts": false,
+          "choices": [
+            {
+              "id": "normal",
+              "label": "无限制"
+            },
+            {
+              "id": "dragon",
+              "label": "祖龙族"
+            },
+            {
+              "id": "star",
+              "label": "星灵族"
+            },
+            {
+              "id": "ghost",
+              "label": "尸鬼族"
+            },
+            {
+              "id": "native",
+              "label": "原生族"
+            },
+            {
+              "id": "puppet",
+              "label": "木偶族"
+            }
+          ],
+          "add_label": "添加塔",
+          "default": [
+            {
+              "id": "normal",
+              "label": "无限制",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "key": "secret_garden",
+          "type": "bool",
+          "label": "挑战塔中秘庭",
+          "default": true
+        }
+      ]
+    }
+  },
+  {
+    "key": "cocoon",
+    "name": "永生之茧",
+    "description": "按添加的副本、优先级及次数挑战",
+    "settings": {
+      "mode": "clear",
+      "hint": "优先每日任务，再按副本顺序消耗尖刺。不勾选保留尖刺就用完；游戏次数已用完或所选队伍均失败时换下一个副本。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "reserve_spikes_enabled",
+          "type": "bool",
+          "label": "保留尖刺",
+          "default": false,
+          "description": "不勾选时不保留尖刺，继续挑战所选可打副本，直到尖刺用完。"
+        },
+        {
+          "key": "reserve_spikes",
+          "type": "number",
+          "label": "保留数量",
+          "default": 1,
+          "min": 1,
+          "max": 9999,
+          "enabled_when": "reserve_spikes_enabled",
+          "indent": 18
+        },
+        {
+          "key": "daily_tasks",
+          "type": "bool",
+          "label": "挑战每日任务",
+          "default": true,
+          "description": "优先完成下方三项每日任务，已完成的自动跳过。"
+        },
+        {
+          "key": "refresh_tasks",
+          "type": "bool",
+          "label": "自动使用魔典",
+          "default": true,
+          "enabled_when": "daily_tasks",
+          "description": "开启每日任务且三项全部完成后刷新，再优先完成新一轮。只使用库存魔典。"
+        },
+        {
+          "key": "refresh_require_three_spikes",
+          "type": "bool",
+          "label": "刷新前确保可用尖刺至少 3 个",
+          "default": true,
+          "enabled_when": "refresh_tasks",
+          "description": "扣除保留尖刺后计算；不足 3 个时不刷新。关闭后可能留下未完成的每日任务。"
+        },
+        {
+          "key": "max_refreshes",
+          "type": "number",
+          "label": "最多刷新次数（0为不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100,
+          "enabled_when": "refresh_tasks"
+        },
+        {
+          "key": "targets",
+          "type": "stages",
+          "label": "副本顺序",
+          "counts": false,
+          "choices": [
+            {
+              "id": "gold",
+              "label": "富有",
+              "reward": "金币"
+            },
+            {
+              "id": "spore",
+              "label": "全体强化",
+              "reward": "强化孢子"
+            },
+            {
+              "id": "experience",
+              "label": "经验",
+              "reward": "怪兽经验"
+            },
+            {
+              "id": "divinity",
+              "label": "神性集合",
+              "reward": "神性孢子"
+            },
+            {
+              "id": "capture",
+              "label": "捕兽大师",
+              "reward": "捕兽夹"
+            },
+            {
+              "id": "evolution",
+              "label": "进化试炼",
+              "reward": "进化孢子"
+            },
+            {
+              "id": "wall",
+              "label": "墙战",
+              "reward": "战墙材料"
+            },
+            {
+              "id": "polarization",
+              "label": "极化之地",
+              "reward": "极化石"
+            },
+            {
+              "id": "stone",
+              "label": "一地原石",
+              "reward": "原石"
+            },
+            {
+              "id": "summon",
+              "label": "造唤梦境",
+              "reward": "造唤许可"
+            }
+          ],
+          "add_label": "添加副本",
+          "default": [
+            {
+              "id": "gold",
+              "label": "富有",
+              "reward": "金币",
+              "enabled": true
+            },
+            {
+              "id": "spore",
+              "label": "全体强化",
+              "reward": "强化孢子",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "key": "tribe",
+    "name": "部落冒险",
+    "description": "优先冒险关卡，可在无关卡时随机挑战图腾，保留指定战令",
+    "settings": {
+      "mode": "clear",
+      "hint": "按列表顺序尝试，通关后前进；全部失败再换关。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            2
+          ],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "reserve_orders",
+          "type": "number",
+          "label": "保留战令（0为用完）",
+          "default": 0,
+          "min": 0,
+          "max": 9999,
+          "advanced": false
+        },
+        {
+          "key": "random_totem",
+          "type": "bool",
+          "label": "无可挑战冒险关卡时随机挑战图腾",
+          "default": true
+        }
+      ]
+    }
+  },
+  {
+    "key": "rift",
+    "name": "凿星裂痕",
+    "description": "优先最高关，打不了回退前一关；胜利后使用库存钥匙开箱",
+    "settings": {
+      "mode": "clear",
+      "hint": "优先最高关；等级未解锁或所选阵容均失败时回退前一关，本轮不再尝试失败高关。胜利后使用库存钥匙开箱。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            2,
+            1
+          ],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "reserve_keys",
+          "type": "number",
+          "label": "保留钥匙（0为用完）",
+          "default": 0,
+          "min": 0,
+          "max": 9999,
+          "advanced": false
+        }
+      ]
+    }
+  },
+  {
+    "key": "forest",
+    "name": "黑暗森林",
+    "description": "探索当前森林并挑战已开放怪兽，计时或点数用尽仍处理免费挑战，不重置",
+    "settings": {
+      "mode": "clear",
+      "hint": "优先自动挑战已开放的免费怪兽；探索计时中、探索点用尽或达到探索上限时仍检查挑战。普通模式边拖图边处理，异常最多退出重进3次；高级模式按节点优先级查找。不等待、不加速、不重置。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            1,
+            2,
+            3
+          ],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "mode",
+          "type": "choice",
+          "label": "运行模式",
+          "choices": [
+            {
+              "id": "simple",
+              "label": "普通（推荐）"
+            },
+            {
+              "id": "advanced",
+              "label": "高级"
+            }
+          ],
+          "default": "simple",
+          "notice": "高级模式会平移整张地图并逐节点识别类型，当前不稳定，可能找不到节点或整个任务失败；普通模式只点击当前画面已显示的节点，更稳但探索数量较少。"
+        },
+        {
+          "key": "strategy",
+          "type": "choice",
+          "label": "探索策略",
+          "choices": [
+            {
+              "id": "overflow",
+              "label": "防溢出优先"
+            },
+            {
+              "id": "node",
+              "label": "节点优先"
+            }
+          ],
+          "default": "overflow",
+          "enabled_when": "mode",
+          "enabled_value": "advanced"
+        },
+        {
+          "key": "reserve_points",
+          "type": "number",
+          "label": "保留探索点（0为用完）",
+          "default": 0,
+          "min": 0,
+          "max": 9999,
+          "advanced": false
+        },
+        {
+          "key": "max_explorations",
+          "type": "number",
+          "label": "最多探索节点（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "collect_resources",
+          "type": "bool",
+          "label": "收取已探索资源",
+          "default": true
+        },
+        {
+          "key": "node_priority",
+          "type": "order",
+          "label": "节点优先级",
+          "counts": false,
+          "default": [
+            {
+              "id": "lamp",
+              "label": "森灯",
+              "enabled": true
+            },
+            {
+              "id": "beast",
+              "label": "凶兽",
+              "enabled": true
+            },
+            {
+              "id": "spore",
+              "label": "强化孢子",
+              "enabled": true
+            },
+            {
+              "id": "divinity",
+              "label": "神性孢子",
+              "enabled": true
+            },
+            {
+              "id": "evolution",
+              "label": "进化孢子",
+              "enabled": true
+            },
+            {
+              "id": "spring",
+              "label": "命运之泉",
+              "enabled": true
+            },
+            {
+              "id": "unknown",
+              "label": "未探明节点",
+              "enabled": true
+            }
+          ],
+          "enabled_when": "mode",
+          "enabled_value": "advanced"
+        }
+      ]
+    }
+  },
+  {
+    "key": "origin",
+    "name": "起源殿",
+    "description": "北京时间20:00–22:00使用所选队伍，消耗免费挑战次数",
+    "settings": {
+      "mode": "score",
+      "hint": "北京时间20:00–22:00使用免费次数；多队按顺序轮流出战。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            2
+          ],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "auto_settle",
+          "type": "bool",
+          "label": "自动点击结算",
+          "default": true
+        }
+      ]
+    }
+  },
+  {
+    "key": "arena",
+    "name": "斗技场",
+    "description": "按所选战力策略寻敌，最多刷新3次后选当前低于己方的最高战力对手，消耗免费次数",
+    "settings": {
+      "mode": "score",
+      "hint": "每次寻敌最多免费刷新3次，仍无区间内对手则选当前低于己方的最高战力；仍无可选对手就结束本次斗技场。区间含两端，同一队伍本轮跳过已败对手；按实际出战战力核对，战力不保证胜利。",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            2
+          ],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "opponent",
+          "type": "choice",
+          "label": "选择对手",
+          "choices": [
+            {
+              "id": "power_gap",
+              "label": "指定战力差优先（最多刷新3次）"
+            },
+            {
+              "id": "strongest_below",
+              "label": "低于己方的最高战力"
+            },
+            {
+              "id": "weakest",
+              "label": "战力最低"
+            },
+            {
+              "id": "random",
+              "label": "随机挑战"
+            }
+          ],
+          "default": "power_gap"
+        },
+        {
+          "key": "power_gap_min",
+          "type": "number",
+          "label": "比己方低：最小战力差",
+          "default": 10000,
+          "min": 1,
+          "max": 99999999,
+          "enabled_when": "opponent",
+          "enabled_value": "power_gap"
+        },
+        {
+          "key": "power_gap_max",
+          "type": "number",
+          "label": "比己方低：最大战力差",
+          "default": 20000,
+          "min": 1,
+          "max": 99999999,
+          "enabled_when": "opponent",
+          "enabled_value": "power_gap"
+        },
+        {
+          "key": "auto_settle",
+          "type": "bool",
+          "label": "自动点击结算",
+          "default": true
+        }
+      ]
+    }
+  },
+  {
+    "key": "nest",
+    "name": "谜之巢穴",
+    "description": "当天尚未挑战时完成一次暴走旷野",
+    "settings": {
+      "hint": "当天未挑战过才完成暴走旷野。默认沿用当前完整阵容和援军；选择多队时按顺序执行，受挑战上限约束。",
+      "mode": "score",
+      "fields": [
+        {
+          "key": "teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [],
+          "min": 1,
+          "max": 5
+        },
+        {
+          "key": "max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 1,
+          "min": 0,
+          "max": 100
+        },
+        {
+          "key": "buff_priority",
+          "type": "order",
+          "label": "增益优先级",
+          "counts": false,
+          "default": [
+            {
+              "id": "assist",
+              "label": "怪兽助战",
+              "enabled": true
+            },
+            {
+              "id": "lifesteal",
+              "label": "吸血",
+              "enabled": true
+            },
+            {
+              "id": "attack",
+              "label": "攻击力",
+              "enabled": true
+            },
+            {
+              "id": "level",
+              "label": "谜之怪兽等级",
+              "enabled": true
+            },
+            {
+              "id": "damage",
+              "label": "伤害提升",
+              "enabled": true
+            },
+            {
+              "id": "reduction",
+              "label": "减伤",
+              "enabled": true
+            },
+            {
+              "id": "health",
+              "label": "生命上限",
+              "enabled": true
+            },
+            {
+              "id": "revive",
+              "label": "复活",
+              "enabled": true
+            },
+            {
+              "id": "dominance",
+              "label": "霸气",
+              "enabled": true
+            },
+            {
+              "id": "size",
+              "label": "体型",
+              "enabled": true
+            },
+            {
+              "id": "speed",
+              "label": "移速",
+              "enabled": true
+            },
+            {
+              "id": "heal",
+              "label": "生命恢复",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "key": "celebration",
+    "name": "庆典活动",
+    "description": "丰野间的三阵入局、进击巨物及拼二每日；未开放的活动自动跳过",
+    "settings": {
+      "default_enabled": true,
+      "hint": "集中处理丰野间活动；未开放、已结束或没有入口时跳过。",
+      "fields": [
+        {
+          "key": "triad",
+          "type": "bool",
+          "label": "三阵入局",
+          "default": true
+        },
+        {
+          "key": "triad_auto_settle",
+          "type": "bool",
+          "label": "自动结算（按钮仍在时持续点击）",
+          "default": true,
+          "enabled_when": "triad",
+          "indent": 18
+        },
+        {
+          "key": "giant",
+          "type": "bool",
+          "label": "进击巨物",
+          "default": false
+        },
+        {
+          "key": "giant_teams",
+          "type": "teams",
+          "label": "阵容顺序",
+          "default": [
+            1
+          ],
+          "min": 1,
+          "max": 5,
+          "enabled_when": "giant",
+          "indent": 18
+        },
+        {
+          "key": "giant_max_runs",
+          "type": "number",
+          "label": "挑战上限（0不限）",
+          "default": 0,
+          "min": 0,
+          "max": 100,
+          "enabled_when": "giant",
+          "indent": 18
+        },
+        {
+          "key": "giant_skip_completed",
+          "type": "bool",
+          "label": "当天已打过则跳过",
+          "default": true,
+          "enabled_when": "giant",
+          "indent": 18
+        },
+        {
+          "key": "giant_auto_settle",
+          "type": "bool",
+          "label": "自动点击结算",
+          "default": true,
+          "enabled_when": "giant",
+          "indent": 18
+        },
+        {
+          "key": "daily_puzzle",
+          "type": "bool",
+          "label": "拼二每日300分及树叶奖励",
+          "default": false
+        }
+      ]
+    }
+  },
+  {
+    "key": "rewards",
+    "name": "任务领奖",
+    "description": "领取星律、任务挑战与世界回响四项免费奖励",
+    "settings": {
+      "fields": [
+        {
+          "key": "collect_idle",
+          "type": "bool",
+          "label": "星律收获",
+          "default": true
+        },
+        {
+          "key": "tabs",
+          "type": "order",
+          "label": "领奖项目",
+          "counts": false,
+          "default": [
+            {
+              "id": "daily",
+              "label": "每日挑战",
+              "enabled": true
+            },
+            {
+              "id": "side",
+              "label": "支线冒险",
+              "enabled": true
+            },
+            {
+              "id": "main",
+              "label": "主线任务",
+              "enabled": true
+            }
+          ]
+        },
+        {
+          "key": "max_batches",
+          "type": "number",
+          "label": "每项最多领取批次",
+          "default": 1,
+          "min": 0,
+          "max": 10
+        },
+        {
+          "key": "world_echoes",
+          "type": "order",
+          "label": "世界回响",
+          "counts": false,
+          "default": [
+            {
+              "id": "monument",
+              "label": "世界丰碑",
+              "enabled": true
+            },
+            {
+              "id": "lost",
+              "label": "遗落回响",
+              "enabled": true
+            },
+            {
+              "id": "torrent",
+              "label": "超星洪流",
+              "enabled": true
+            },
+            {
+              "id": "notes",
+              "label": "微光笔记",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "key": "other",
+    "name": "其他任务",
+    "description": "好友管理、免费奖励、背包整理、野生怪兽捕捉与深渊先遣",
+    "settings": {
+      "fields": [
+        {
+          "key": "friend_management",
+          "type": "bool",
+          "label": "好友管理",
+          "default": true,
+          "compact": true,
+          "group": "friend_management"
+        },
+        {
+          "key": "exchange_friend_coins",
+          "type": "bool",
+          "label": "一键赠送、收取好友币",
+          "default": true,
+          "enabled_when": "friend_management",
+          "indent": 18,
+          "compact": true,
+          "group": "friend_management"
+        },
+        {
+          "key": "remove_inactive_friends",
+          "type": "bool",
+          "label": "清理长期未登录的好友",
+          "default": false,
+          "enabled_when": "friend_management",
+          "indent": 18,
+          "compact": true,
+          "group": "friend_management"
+        },
+        {
+          "key": "inactive_days",
+          "type": "number",
+          "label": "未登录天数（超过才清理）",
+          "default": 5,
+          "min": 1,
+          "max": 365,
+          "enabled_when": "remove_inactive_friends",
+          "indent": 36,
+          "description": "只有明确超过该天数的好友才删除；在线、时间不明或刚好达到该天数的好友保留。",
+          "compact": true,
+          "group": "friend_management"
+        },
+        {
+          "key": "auto_add_friends",
+          "type": "bool",
+          "label": "自动添加好友至上限",
+          "default": true,
+          "enabled_when": "friend_management",
+          "indent": 18,
+          "description": "先同意现有申请，再向推荐玩家申请。需要对方同意时记录等待状态，不重复发送申请。",
+          "compact": true,
+          "group": "friend_management"
+        },
+        {
+          "key": "collect_daily_single",
+          "type": "bool",
+          "label": "领取每日一发",
+          "default": true,
+          "compact": true,
+          "group": "collect_daily_single"
+        },
+        {
+          "key": "collect_plane_lord",
+          "type": "bool",
+          "label": "领取位面领主免费钻石",
+          "default": true,
+          "compact": true,
+          "group": "collect_plane_lord"
+        },
+        {
+          "key": "collect_contract",
+          "type": "bool",
+          "label": "蜕变契约任务及奖励",
+          "default": true,
+          "compact": true,
+          "group": "collect_contract"
+        },
+        {
+          "key": "piggy_bank",
+          "type": "bool",
+          "label": "屯屯扑满（奖励≥200时敲开）",
+          "default": false,
+          "description": "每轮最多敲开一次；储存不足200不执行。优先用库存木锤，无库存时只购买1个、费用必须为50钻石；不使用金锤。",
+          "compact": true,
+          "group": "piggy_bank"
+        },
+        {
+          "key": "buy_star_spores",
+          "type": "bool",
+          "label": "购买饲星商店进化、强化孢子",
+          "default": true,
+          "compact": true,
+          "group": "buy_star_spores"
+        },
+        {
+          "key": "convert_star_souls",
+          "type": "bool",
+          "label": "饲星之魂不足时转化究极怪兽",
+          "default": false,
+          "enabled_when": "buy_star_spores",
+          "indent": 18,
+          "description": "只补足孢子购买缺口，逐只转化未培养的究极怪兽；不转化其他品级。",
+          "compact": true,
+          "group": "buy_star_spores"
+        },
+        {
+          "key": "evolve_blue_for_star_souls",
+          "type": "bool",
+          "label": "究极不足时进化1级幻化怪兽",
+          "default": false,
+          "enabled_when": "convert_star_souls",
+          "indent": 36,
+          "description": "仅选择1级蓝色幻化怪兽；核对究极品级、金币和进化孢子消耗，不明时停止。",
+          "compact": true,
+          "group": "buy_star_spores"
+        },
+        {
+          "key": "buy_blue_eggs_for_star_souls",
+          "type": "bool",
+          "label": "蓝色怪兽不足时兑换幻化怪兽茧",
+          "default": false,
+          "enabled_when": "evolve_blue_for_star_souls",
+          "indent": 54,
+          "description": "先使用背包已有怪兽茧；不足才从饲星商店用饲星之魂兑换，不使用钻石。",
+          "compact": true,
+          "group": "buy_star_spores"
+        },
+        {
+          "key": "buy_all_blue_eggs",
+          "type": "bool",
+          "label": "兑换全部可负担的怪兽茧",
+          "default": false,
+          "enabled_when": "buy_blue_eggs_for_star_souls",
+          "indent": 72,
+          "compact": true,
+          "group": "buy_star_spores"
+        },
+        {
+          "key": "star_egg_target",
+          "type": "choice",
+          "label": "怪兽茧选用怪兽",
+          "choices": [
+            {
+              "id": "暴龙",
+              "label": "暴龙"
+            },
+            {
+              "id": "轰龙",
+              "label": "轰龙"
+            },
+            {
+              "id": "行尸",
+              "label": "行尸"
+            },
+            {
+              "id": "捕食者",
+              "label": "捕食者"
+            },
+            {
+              "id": "虚刃",
+              "label": "虚刃"
+            },
+            {
+              "id": "跃迁兽",
+              "label": "跃迁兽"
+            },
+            {
+              "id": "强袭",
+              "label": "强袭"
+            },
+            {
+              "id": "停顿",
+              "label": "停顿"
+            }
+          ],
+          "default": "停顿",
+          "enabled_when": "buy_blue_eggs_for_star_souls",
+          "indent": 72,
+          "compact": true,
+          "group": "buy_star_spores"
+        },
+        {
+          "key": "tribe_gold_donation",
+          "type": "bool",
+          "label": "支配核心金币捐献（每天一次）",
+          "default": false,
+          "compact": true,
+          "group": "tribe_gold_donation"
+        },
+        {
+          "key": "open_monster_boxes",
+          "type": "bool",
+          "label": "自动开启幻化怪兽茧",
+          "default": false,
+          "compact": true,
+          "group": "open_monster_boxes"
+        },
+        {
+          "key": "monster_box_mode",
+          "type": "choice",
+          "label": "开启方式",
+          "choices": [
+            {
+              "id": "specified",
+              "label": "指定怪兽"
+            },
+            {
+              "id": "balanced",
+              "label": "均匀开启"
+            },
+            {
+              "id": "random",
+              "label": "系统随机"
+            }
+          ],
+          "default": "balanced",
+          "enabled_when": "open_monster_boxes",
+          "indent": 18,
+          "description": "均匀开启按八种怪兽轮换并记住进度；系统随机由脚本随机选择。每次选择消耗一个茧。",
+          "compact": true,
+          "group": "open_monster_boxes"
+        },
+        {
+          "key": "monster_box_target",
+          "type": "choice",
+          "label": "指定怪兽",
+          "choices": [
+            {
+              "id": "暴龙",
+              "label": "暴龙"
+            },
+            {
+              "id": "轰龙",
+              "label": "轰龙"
+            },
+            {
+              "id": "行尸",
+              "label": "行尸"
+            },
+            {
+              "id": "捕食者",
+              "label": "捕食者"
+            },
+            {
+              "id": "虚刃",
+              "label": "虚刃"
+            },
+            {
+              "id": "跃迁兽",
+              "label": "跃迁兽"
+            },
+            {
+              "id": "强袭",
+              "label": "强袭"
+            },
+            {
+              "id": "停顿",
+              "label": "停顿"
+            }
+          ],
+          "default": "暴龙",
+          "enabled_when": "monster_box_mode",
+          "enabled_value": "specified",
+          "indent": 18,
+          "compact": true,
+          "group": "open_monster_boxes"
+        },
+        {
+          "key": "monster_box_limit",
+          "type": "number",
+          "label": "最多开启（0为全部）",
+          "default": 0,
+          "min": 0,
+          "max": 9999,
+          "enabled_when": "open_monster_boxes",
+          "indent": 18,
+          "compact": true,
+          "group": "open_monster_boxes"
+        },
+        {
+          "key": "clear_bag_notifications",
+          "type": "bool",
+          "label": "清除背包新物品感叹号",
+          "default": true,
+          "compact": true,
+          "group": "clear_bag_notifications"
+        },
+        {
+          "key": "challenge_abyss",
+          "type": "bool",
+          "label": "深渊先遣",
+          "default": false,
+          "compact": true,
+          "group": "challenge_abyss"
+        }
+      ]
+    }
+  },
+  {
+    "key": "finish",
+    "name": "结束关闭",
+    "description": "完成并保存记录后，关闭超二收菜和MuMu",
+    "settings": {
+      "hint": "全部任务完成并保存记录后关闭；遇到失败或手动停止时保留现场。",
+      "fields": [
+        {
+          "key": "close_mumu",
+          "type": "bool",
+          "label": "关闭MuMu模拟器",
+          "default": true
+        },
+        {
+          "key": "close_app",
+          "type": "bool",
+          "label": "关闭超二收菜",
+          "default": true,
+          "notice": "关闭后可能无法看到捕捉怪兽的信息；可在运行记录中查看。"
+        }
+      ]
+    }
+  }
+]

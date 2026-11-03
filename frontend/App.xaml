@@ -1,0 +1,28 @@
+<Application x:Class="Chao2Harvester.App"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ xmlns:hc="https://handyorg.github.io/handycontrol">
+ <Application.Resources>
+  <ResourceDictionary>
+   <ResourceDictionary.MergedDictionaries>
+    <hc:ThemeResources />
+    <hc:Theme />
+    <!-- Original MAA resources, see UPSTREAM.md. -->
+    <ResourceDictionary Source="Styles/MaaLight.xaml" />
+    <ResourceDictionary Source="Styles/Button.xaml" />
+    <ResourceDictionary Source="Styles/CheckBox.xaml" />
+    <ResourceDictionary Source="Styles/ListBox.xaml" />
+    <ResourceDictionary Source="Styles/NumericUpDown.xaml" />
+    <ResourceDictionary Source="Styles/Divider.xaml" />
+    <ResourceDictionary Source="Styles/Geometries.xaml" />
+    <ResourceDictionary Source="Styles/Inputs.xaml" />
+    <ResourceDictionary Source="Styles/Accent.xaml" />
+   </ResourceDictionary.MergedDictionaries>
+   <Style TargetType="TextBlock" BasedOn="{StaticResource TextBlockDefault}">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="TextAlignment" Value="Left" />
+   </Style>
+  </ResourceDictionary>
+ </Application.Resources>
+</Application>

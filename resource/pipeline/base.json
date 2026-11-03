@@ -1,0 +1,4 @@
+{
+  "Observe": {"recognition":"OCR", "roi":[0,0,1280,720], "action":"DoNothing"},
+  "VerifiedClick": {"recognition":"OCR", "expected":["^不可能匹配$"], "action":"Click", "timeout":1000}
+}

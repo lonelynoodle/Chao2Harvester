@@ -1,0 +1,17 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <!-- Only the accent changes; MAA/HandyControls keep the controls and spacing. -->
+ <Color x:Key="PrimaryColor">#169C86</Color>
+ <Color x:Key="DarkPrimaryColor">#118573</Color>
+ <Color x:Key="LightPrimaryColor">#43B8A5</Color>
+ <SolidColorBrush x:Key="PrimaryBrush" Color="#169C86" />
+ <SolidColorBrush x:Key="DarkPrimaryBrush" Color="#118573" />
+ <SolidColorBrush x:Key="LightPrimaryBrush" Color="#43B8A5" />
+ <SolidColorBrush x:Key="TitleBrush" Color="#169C86" />
+ <SolidColorBrush x:Key="WildYoungBrush" Color="#398344" />
+ <SolidColorBrush x:Key="WildPhantomBrush" Color="#287BC1" />
+ <SolidColorBrush x:Key="WildUltimateBrush" Color="#914BC0" />
+ <SolidColorBrush x:Key="WildImmortalBrush" Color="#AA770F" />
+ <SolidColorBrush x:Key="WildAwakenedBrush" Color="#D94044" />
+ <SolidColorBrush x:Key="TaskQueue.TaskItemStatus.InProgress" Color="#26169C86" />
+</ResourceDictionary>
