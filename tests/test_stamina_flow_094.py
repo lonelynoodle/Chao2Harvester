@@ -3,7 +3,7 @@ import threading
 import pytest
 import chao2.workflows as flow
 from chao2.activities import stamina_servings
-from chao2.policy import TaskBlocked,UserStopped
+from chao2.policy import UserStopped
 from test_configuration import daily,captured,screen
 
 
@@ -89,6 +89,6 @@ def test_unverified_stamina_gain_is_not_counted_as_a_successful_claim(tmp_path):
     d.stamina_offer=lambda:captured('v094-stamina-one',True)
     d.b.click_text=lambda *a,**kw:calls.append('claim')
     d.observe=lambda:screen()
-    with pytest.raises(TaskBlocked,match='到账未核实'):d.replenish_stamina()
+    d.replenish_stamina()
     assert calls==['claim'] and d.report.get('stamina_claims',0)==0
-    assert d.report['stamina_refill']['phase']=='verifying'
+    assert d.report['stamina_refill_failures']==[{'source':'free','task':None,'reason':'100体力到账未核实'}]

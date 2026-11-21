@@ -10,7 +10,7 @@ from test_configuration import daily,captured,screen
 from chao2.configuration import normalize_settings,plan_tasks,RAMPAGE_BUFFS
 from chao2.workflows import ORDER
 from chao2.daily_challenges import rampage_buff
-from chao2.policy import SafetyStop,TaskBlocked,is_stamina_potion_dialog
+from chao2.policy import SafetyStop,TaskBlocked,is_stamina_potion_dialog,is_stamina_potion_confirmation
 from chao2.puzzle import daily_leaves_claimed,puzzle_daily
 from chao2.rift import rift_detail,rift_level_locked
 
@@ -70,6 +70,36 @@ def test_potion_wont_overflow(tmp_path):
     d.home=lambda:screen();d.world_resources=lambda _:{'stamina':80,'stamina_cap':166}
     d.potion_inventory=lambda:pytest.fail('Would overflow')
     assert d.use_stamina_potion() is None
+
+
+@pytest.mark.parametrize('balance,accepted',[(2,True),(36,False)])
+def test_one_potion_second_confirmation_checks_capacity_then_verifies_receipt(tmp_path,balance,accepted):
+    d=daily(tmp_path,{'task_options':{'main':{'auto_potions':True}}});d.selected=['main']
+    bag=screen(('背包',132,12,60,30),('全部',30,196,50,28),('道具',38,310,55,35),
+               ('元核',30,421,50,28),('移动力药水',850,103,140,26),
+               ('使用后可获得100移动力',780,228,280,23),('已拥有6',850,150,135,25))
+    quantity=screen(('移动力药水',570,273,139,27),('已拥有6',596,309,92,24),('使用数量',334,363,83,24),
+                    ('取消',456,459,53,29),('确定',770,459,55,30))
+    dialog=screen(('是否消耗移动力药水回复100移动力?',416,299,433,26),('取消',454,480,55,32),
+                  ('确定',770,481,55,31),(f'{balance}/135',1206,15,56,26))
+    assert is_stamina_potion_confirmation(dialog)
+    with pytest.raises(SafetyStop):d.b.guard(dialog)
+    after=copy.deepcopy(bag);after.words[-1].text='已拥有5'
+    pages=iter([dialog,after]);clicks=[]
+    resources=iter([{'stamina':2,'stamina_cap':135},{'stamina':102,'stamina_cap':135}])
+    d.home=lambda:screen();d.world_resources=lambda _:next(resources)
+    d.potion_inventory=lambda:bag;d.await_page=lambda *a:quantity
+    d.observe=lambda:next(pages);d.b.read_number=lambda *a:1
+    d.b.click_text=lambda s,p,**kw:clicks.append(p)
+    d.b.click_at=lambda s,p,a,reason:clicks.append(reason)
+    if accepted:
+        assert d.use_stamina_potion()==100
+        assert d.report['stamina_potions'][0]['stock_after']==5
+        assert clicks[-1]=='确认使用一瓶库存药水恢复100移动力'
+    else:
+        with pytest.raises(TaskBlocked,match='可容纳100移动力'):d.use_stamina_potion()
+        assert clicks[-1]=='取消库存药水使用'
+    assert len(clicks)==3 and not d.b.potion_confirmation_active
 
 
 @pytest.mark.parametrize('enabled',[True,False])

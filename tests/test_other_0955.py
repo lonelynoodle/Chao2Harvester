@@ -2,7 +2,7 @@
 import pytest
 from chao2.backend import Word
 from chao2.compact_balance import displayed_balance,balance_delta_possible,read_displayed_balance
-from chao2.policy import TaskBlocked,SafetyStop
+from chao2.policy import TaskBlocked,SafetyStop,IsolatedTaskError
 from test_configuration import daily,captured,screen
 
 @pytest.mark.parametrize('text',['1.02万','1.07万','1万','1.1亿'])
@@ -71,7 +71,7 @@ def test_compact_wallet_does_not_let_missing_hammer_purchase_pass(tmp_path):
     import chao2.piggy_bank as piggy
     from unittest.mock import patch
     with patch.object(piggy,'read_piggy_offer',return_value={'balance':displayed_balance('1.02万'),'remaining':3}):
-        with pytest.raises(SafetyStop,match='未核实'):d.collect_piggy_bank()
+        with pytest.raises(IsolatedTaskError,match='未核实'):d.collect_piggy_bank()
     assert state['purchases']==1 and state['claims']==0 and d.state['piggy_pending']['phase']=='buy_requested'
 
 def test_shop_caption_missing_in_fresh_frame_is_locally_confirmed_and_only_navigation_retried(tmp_path):

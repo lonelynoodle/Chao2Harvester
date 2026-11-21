@@ -58,7 +58,7 @@ def test_actual_copied_lineup_survives_header_reflow_without_recopying(tmp_path,
     assert d.apply_saved_team(captured('tribe-formation'),1) is target
     check=d.report['team_copy_checks'][0]
     assert check['status']=='verified' and check['reads']==missing_reads+1
-    assert check['matched_monsters']==5 and check['god_verified']
+    assert check['matched_monsters']==5 and 'god_verified' not in check
     assert copies==['^复制此配置$']
 
 
@@ -111,7 +111,7 @@ def test_level_gated_first_tower_checks_its_existing_secrets_then_other_tower(tm
         else:click(s,p,**kw)
     game.d.observe=read;game.d.b.click_text=tap
     message=game.d.tower()
-    assert game.opened==['normal','dragon'] and game.secrets==['normal','dragon']
+    assert game.opened==['normal','dragon'] and game.secrets==['normal','dragon','puppet']
     assert len(game.challenges)==game.d.task_counts['tower']==2
     assert all(row[0]=='dragon' for row in game.challenges)
     assert '等级未解锁跳过1座塔' in message

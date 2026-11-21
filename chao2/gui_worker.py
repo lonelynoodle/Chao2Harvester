@@ -22,6 +22,22 @@ def listen_stop(stop):
     # Parent exit or a broken pipe must not leave game input running.
     stop.set()
 
+def prepare_run_request(request):
+    settings=request['settings']
+    selected=request.get('selected',[])
+    if request.get('only_task') is not None:
+        if request.get('mode')!='run':raise ValueError('只有任务执行支持仅运行本条')
+        if request.get('start_from') is not None:raise ValueError('仅运行本条与从此任务开始不能同时指定')
+        from .task_queue import single_task_request
+        return single_task_request(settings,request['only_task'])
+    if request.get('start_from') is not None:
+        if request.get('mode')!='run':
+            raise ValueError('只有任务执行支持从此任务开始')
+        from .task_queue import continuation_request
+        return continuation_request(settings,selected,request['start_from'])
+    return settings,selected
+
+
 def main():
     sys.stdin.reconfigure(encoding='utf-8')
     sys.stdout.reconfigure(encoding='utf-8')
@@ -31,6 +47,13 @@ def main():
     mode = request.get('mode')
     if mode not in ('run', 'diagnostic', 'launch', 'puzzle', 'tour', 'abyss'):
         raise ValueError('无效运行模式')
+    settings,selected=prepare_run_request(request)
+    from .run_lock import GameRunLease
+    with GameRunLease(settings):
+        return execute_request(mode,settings,selected,stop)
+
+
+def execute_request(mode,settings,selected,stop):
     # Imported only after an explicit request; native logs go to stderr.
     send('log','正在初始化识图组件…')
     send('phase','正在初始化识图组件')
@@ -45,8 +68,6 @@ def main():
         # cancellation listener; queued stop/EOF still cancels subsequent input.
         threading.Thread(target=listen_stop, args=(stop,), daemon=True).start()
         send('log','识图组件已就绪')
-        settings = request['settings']
-        selected = request.get('selected', [])
         if any(k not in TASKS for k in selected):
             raise ValueError('未知任务')
         log = lambda msg: send('log', str(msg))

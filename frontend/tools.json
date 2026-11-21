@@ -46,6 +46,27 @@
         "max": 5
       },
       {
+        "key": "wall_mode",
+        "type": "choice",
+        "label": "战墙",
+        "choices": [
+          {
+            "id": "ignore",
+            "label": "忽视（不检查）"
+          },
+          {
+            "id": "attack",
+            "label": "进攻型"
+          },
+          {
+            "id": "defense",
+            "label": "防御型"
+          }
+        ],
+        "default": "ignore",
+        "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
+      },
+      {
         "key": "max_battles",
         "type": "number",
         "label": "最多挑战次数",
@@ -107,6 +128,27 @@
         ],
         "min": 1,
         "max": 5
+      },
+      {
+        "key": "wall_mode",
+        "type": "choice",
+        "label": "战墙",
+        "choices": [
+          {
+            "id": "ignore",
+            "label": "忽视（不检查）"
+          },
+          {
+            "id": "attack",
+            "label": "进攻型"
+          },
+          {
+            "id": "defense",
+            "label": "防御型"
+          }
+        ],
+        "default": "ignore",
+        "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
       }
     ]
   },

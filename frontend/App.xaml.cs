@@ -9,6 +9,7 @@ public partial class App : Application
     private Mutex? singleton;
     public static string Root { get; } = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."));
     public static bool Smoke => Environment.GetCommandLineArgs().Contains("--smoke");
+    public static bool RunRequested=>!Smoke && Environment.GetCommandLineArgs().Contains("--run");
     public static string DiagnosticsRoot=>Path.Combine(Root,"dev","diagnostics","smoke");
     public static string? ActiveRunFolder { get; set; }
     protected override void OnStartup(StartupEventArgs e)

@@ -47,7 +47,7 @@ public class RunLogs
     public void Append(LogLine line)
     {
         if(Current is null)Open(null,"运行准备","");
-        Current!.Lines.Add(line);
+        LogLine.AppendTo(Current!.Lines,line);
     }
     public LogGroup Task(string key,string title,string state)
     {

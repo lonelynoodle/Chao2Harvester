@@ -61,6 +61,9 @@ class OverviewNavigation:
                 if text=='永生之茧':
                     self.note('已通过局部识别确认永生之茧入口')
                     return Screen(s.image,[*s.words,Word(text,word.box,word.score)],s.when)
+        for pattern in dict.fromkeys(patterns.values()):
+            if not s.find(pattern,(350,80,180,490)):
+                self.b.confirm_label(s,pattern,(350,80,180,490),scale=3,threshold=.8)
         return s
 
     def scroll_overview(self,s,*,retry=False,reverse=False):
@@ -142,6 +145,9 @@ class OverviewNavigation:
         expected=next((anchors for route,anchors in OVERVIEW_ROUTES.values() if route==pattern),None)
         # The map may appear briefly during a jump. A navigation click is not
         # enough: wait for the actual destination without another back/click.
+        copy_world_frames=0
+        main_route=pattern=='^世界关卡$'
+        unchanged=0;retries=0
         for _ in range(20):
             q=self.observe();self.b.guard(q)
             self.resolve_path_event(q)
@@ -150,7 +156,7 @@ class OverviewNavigation:
                 # Recover directly from the verified territory, without
                 # reopening or scrolling the task overview.
                 return self.enter_tower_selector(q)
-            if pattern=='^世界关卡$':
+            if main_route:
                 from .world_events import is_map_choice
                 from .reward_collection import is_map_story
                 if is_map_choice(q):q=self.open_main_choice(q)
@@ -160,9 +166,26 @@ class OverviewNavigation:
                 if is_map_story(q):q=self.close_map_story(q)
             if not q.has('^玩法概览$','^每日挑战$') and (not expected or q.has(*expected)):
                 return self.claim_tribe_occupation(q) if pattern=='^部落冒险$' else q
+            if main_route:
+                matches=overview_matches(q,{'target':pattern}) if q.has('^玩法概览$','^每日挑战$') else []
+                unchanged=unchanged+1 if matches and abs(matches[0][1].center[1]-w.center[1])<=8 else 0
+                if unchanged>=4 and retries<3:
+                    retries+=1;unchanged=0;w=matches[0][1]
+                    self.navigation_retry('世界关卡箭头未跳转，核对同一行后重试',retries,q)
+                    self.b.click_at(q,(738,w.center[1]+30+(3 if retries%2 else -3)),
+                                    ['^玩法概览$','^每日挑战$',pattern],'重试前往世界关卡')
+            if pattern=='^异象$':
+                from .workflows import is_world
+                copy_world_frames=copy_world_frames+1 if is_world(q) else 0
+                if copy_world_frames>=2:
+                    self.note('概览已定位异象地图，展开世界事件中的异象列表')
+                    return self.open_anomaly_list(q,from_overview=True)
             self.b.sleep(.8)
-        if pattern=='^世界关卡$':
+        if main_route:
             from .workflows import is_world
+            if q.has('^玩法概览$','^每日挑战$'):
+                self.note('世界关卡箭头重试后仍停在概览，返回地图查找可挑战节点')
+                q=self.home(q)
             if is_world(q):
                 self.b.save_screen(q,self.report['folder']/'main-overview-world.png')
                 self.note('世界关卡跳转已到地图，继续查找可见的未通关节点')

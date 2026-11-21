@@ -14,7 +14,7 @@ from PIL import Image
 
 from .anomalies import is_event_panel
 from .backend import Backend, ROOT
-from .policy import TaskBlocked, UserStopped, FightLost, parse_ratio
+from .policy import TaskBlocked, UserStopped, FightLost, BattleReturned, parse_ratio
 from .tool_settings import abyss_options
 from .workflows import Daily, is_world, create_report, write_report
 
@@ -200,10 +200,10 @@ class AbyssPlayer(Daily):
         return detail
 
     def finish_world(self):
-        s = self.menu_page()
-        self.b.click_at(s, (770, 680), ['^深渊先遣$', '^压制词缀$', '每周二.*刷新'], '收起深渊先遣列表')
-        s = self.wait_screen(is_world, '先遣结束后未返回世界')
+        # Home reobserves and retries known side panels. Do not reopen an
+        # already closed menu or turn one swallowed close tap into a failure.
         s = self.home()
+        if not is_world(s):raise TaskBlocked('先遣结束后未返回世界')
         self.report['resources_end'] = self.world_resources(s)
 
     def play(self):
@@ -246,6 +246,8 @@ class AbyssPlayer(Daily):
             except FightLost as lost:
                 result = lost.screen
                 row['outcome'] = 'failed'
+            except BattleReturned as returned:
+                result=returned.screen;row['outcome']='unobserved'
             self.b.save_screen(result, self.report['folder']/f'abyss-result-{len(self.report["team_attempts"])}.png')
             self.exit_result(result)
             s = self.menu_page()
@@ -254,15 +256,18 @@ class AbyssPlayer(Daily):
             delta = None if after['stamina'] is None else ratio[0]-after['stamina']
             row['stamina_spent'] = (50 if row['outcome']=='victory' and delta is not None and 0<=delta<=50
                                     else delta if delta is not None and 0<=delta<=50 else None)
-            self.note(('挑战胜利' if row['outcome']=='victory' else '挑战失败')+f'；本场体力消耗{row["stamina_spent"] if row["stamina_spent"] is not None else "未核实"}，剩余{after["stamina"]}/{after["stamina_cap"]}')
+            self.note(('挑战胜利' if row['outcome']=='victory' else '胜败未观察，已返回先遣列表' if row['outcome']=='unobserved' else '挑战失败')+f'；本场体力消耗{row["stamina_spent"] if row["stamina_spent"] is not None else "未核实"}，剩余{after["stamina"]}/{after["stamina_cap"]}')
             self.checkpoint()
             if row['outcome'] == 'victory':
                 self.report['status'] = 'completed'
                 return '深渊先遣胜利，已核对结算奖励'
             if not abyss_target(s):
                 self.report['status'] = 'partial'
-                return '本次先遣未通过，当前目标已消失，未重复挑战'
+                return ('本场胜败未观察到，当前目标已消失，未重复挑战' if row['outcome']=='unobserved' else
+                        '本次先遣未通过，当前目标已消失，未重复挑战')
         self.report['status'] = 'partial'
+        if any(r.get('outcome')=='unobserved' for r in self.report.get('team_attempts',[])):
+            return '先遣所选阵容已检查，部分胜败未观察到；已核对当前资源与目标'
         return '深渊先遣所选阵容均未通过，已停止重试'
 
 
@@ -273,7 +278,7 @@ def run_abyss(settings, stop, log=print, emit=lambda *a: None):
     def audit(action):
         with (report['folder']/'actions.jsonl').open('a', encoding='utf-8') as f:
             f.write(json.dumps({'time': datetime.now().astimezone().isoformat(), **action}, ensure_ascii=False)+'\n')
-    b = Backend(settings, stop, log, lambda m: emit('phase', m), audit)
+    b = Backend(settings, stop, log, lambda m: emit('phase', m), audit, recover_gold_details=True)
     player = AbyssPlayer(b, report, emit)
     try:
         b.connect()

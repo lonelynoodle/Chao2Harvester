@@ -1,5 +1,6 @@
 """Versioned task options shared by WPF, CLI and the execution planner."""
 from copy import deepcopy
+from .wall_settings import wall_spec
 from .monster_box_settings import MONSTER_BOX_CHOICES
 
 STAMINA_TASKS = ['copies', 'hunt', 'main']
@@ -61,7 +62,7 @@ SPECS = {
     'startup':{'default_enabled':True,'hint':'在开始界面点击“进入游戏”。游戏内自动返回任务入口；已有战斗先等本场结算，再按所选顺序执行任务。','fields':[]},
     'exploration':{'hint':'全部领取已完成的探索，再开始探索；需要时一键指派怪兽。','fields':[]},
     # Keep the stable key so existing team, quota and stamina preferences survive.
-    'copies':{'mode':'clear','fields':[
+    'copies':{'mode':'clear','hint':'开启复制体后，先免费领取被其他探索者击破的宝箱；没有20体力、好友币已满或达到挑战次数上限时仍会领奖。','fields':[
         flag('challenge_copies','复制体',True),
         {**deepcopy(TEAMS),'enabled_when':'challenge_copies','indent':18},
         {**deepcopy(MAX_RUNS),'enabled_when':'challenge_copies','indent':18},
@@ -74,7 +75,15 @@ SPECS = {
         choice('team','使用队伍',[(str(i),f'队伍 {i}') for i in range(1,6)],'2'),
         flag('auto_settle','自动点击结算',True),
         flag('use_search_tokens','使用库存搜索令',True),number('max_searches','最多搜索次数（0为不限）'),*deepcopy(STAMINA_FIELDS)]},
-    'main':combat([number('max_nodes','最多查找关卡（0为不限）',20),*deepcopy(STAMINA_FIELDS)],teams=(1,2,3)),
+    'main':{**combat([
+        {**flag('auto_deity','神灵自动释放',True),
+         'description':'每场主线战斗开始后检查左下角，显示手动时切换为自动。'},
+        flag('search_limit_enabled','限制本轮主线搜索次数',False),
+        {**number('max_searches','最多搜索次数',50,9999),'min':1,
+         'enabled_when':'search_limit_enabled','indent':18,
+         'description':'包含重复关卡和未打开详情的搜索，达到后继续下一个任务。'},
+        *deepcopy(STAMINA_FIELDS)],teams=(1,2,3)),
+        'hint':'每次遇到关卡只用尚未尝试的下一支队伍；再次遇到旧关卡时继续换队，全部失败再跳过。'},
     'tower':combat([reserve('reserve_feathers','保留羽毛'),stages('towers','挑战的塔', [('normal','无限制'),('dragon','祖龙族'),('star','星灵族'),('ghost','尸鬼族'),('native','原生族'),('puppet','木偶族')],['normal']),flag('secret_garden','挑战塔中秘庭',True)]),
     'cocoon':{**combat([
                      {**flag('reserve_spikes_enabled','保留尖刺',False),'description':'不勾选时不保留尖刺，继续挑战所选可打副本，直到尖刺用完。'},
@@ -90,7 +99,10 @@ SPECS = {
                      stages('targets','副本顺序',[(i,n) for i,n,_ in COCOON_CARDS if i not in COCOON_DAILIES],['gold','spore'])],limits=False),
               'hint':'优先每日任务，再按副本顺序消耗尖刺。不勾选保留尖刺就用完；游戏次数已用完或所选队伍均失败时换下一个副本。'},
     'tribe':combat([reserve('reserve_orders','保留战令'),
-                    flag('random_totem','无可挑战冒险关卡时随机挑战图腾',True)],teams=(2,)),
+                    flag('random_totem','无可挑战冒险关卡时随机挑战图腾',True),
+                    flag('clear_auction_dot','消除拍卖所红点（只查看，不竞价）',True),
+                    flag('clear_dynamics_dot','消除部落动态红点',True),
+                    flag('claim_donation_rewards','领取支配核心累计捐献奖励',True)],teams=(2,)),
     'rift':{**combat([reserve('reserve_keys','保留钥匙')],teams=(2,1)),
             'hint':'优先最高关；等级未解锁或所选阵容均失败时回退前一关，本轮不再尝试失败高关。胜利后使用库存钥匙开箱。'},
     'forest':{**combat([
@@ -118,8 +130,8 @@ SPECS = {
          'enabled_when':'opponent','enabled_value':'power_gap'},
         flag('auto_settle','自动点击结算',True)],teams=(2,),mode='score'),
              'hint':'每次寻敌最多免费刷新3次，仍无区间内对手则选当前低于己方的最高战力；仍无可选对手就结束本次斗技场。区间含两端，同一队伍本轮跳过已败对手；按实际出战战力核对，战力不保证胜利。'},
-    'nest':{'hint':'当天未挑战过才完成暴走旷野。默认沿用当前完整阵容和援军；选择多队时按顺序执行，受挑战上限约束。',
-            'mode':'score','fields':[deepcopy(TEAMS),number('max_runs','挑战上限（0不限）',1),ordered('buff_priority','增益优先级',RAMPAGE_BUFFS)]},
+    'nest':{'hint':'当天没有成绩时挑战。勾选重复挑战后，即使已有成绩，也按所选队伍再打一轮；保留当前援军。',
+            'mode':'score','fields':[deepcopy(TEAMS),flag('auto_deity','神灵自动释放',True),flag('repeat_challenge','重复挑战',False),ordered('buff_priority','增益优先级',RAMPAGE_BUFFS)]},
     'giant':combat([flag('skip_completed','当天已打过则跳过',True),flag('auto_settle','自动点击结算',True)],teams=(1,),mode='score'),
     'triad':{'hint':'丰野间匹配三阵入局，使用当日免费次数；战斗中的结算按钮仍可见时持续重读并点击。三支队伍需先在游戏内配置。',
              'fields':[flag('auto_settle','自动结算（按钮仍在时持续点击）',True)]},
@@ -145,6 +157,12 @@ SPECS = {
         {**flag('auto_add_friends','自动添加好友至上限',True),'enabled_when':'friend_management','indent':18,
          'description':'先同意现有申请，再向推荐玩家申请。需要对方同意时记录等待状态，不重复发送申请。'},
         flag('collect_daily_single','领取每日一发',True),
+        {**flag('daily_core_upgrade','每日挑战 · 升级元核',False),
+         'description':'按元核列表逐个查找，可选顺序或倒序，确认单次强化成功后停止。'},
+        {**choice('daily_core_order','元核查找顺序',[('forward','按列表顺序'),('reverse','按列表倒序')],'forward'),
+         'enabled_when':'daily_core_upgrade','indent':18},
+        {**flag('daily_monster_upgrade','每日挑战 · 升级怪兽',False),
+         'description':'从左往右检查怪兽，用已有怪兽经验升一级，成功后停止。'},
         flag('collect_plane_lord','领取位面领主免费钻石',True),
         flag('collect_contract','蜕变契约任务及奖励',True),
         {**flag('piggy_bank','屯屯扑满（奖励≥200时敲开）',False),
@@ -172,20 +190,37 @@ SPECS = {
          'enabled_when':'monster_box_mode','enabled_value':'specified','indent':18},
         {**number('monster_box_limit','最多开启（0为全部）',0,9999),
          'enabled_when':'open_monster_boxes','indent':18},
+        {**flag('evolve_blue_monsters','蓝怪进化紫怪',False),
+         'description':'进化后保留紫怪，跳过锁定蓝怪；可按只数进化，或持续到可用蓝怪、进化孢子不足。金币不足也会停止。'},
+        {**choice('blue_evolution_mode','进化方式',[('count','指定只数'),('until_empty','直到蓝怪或进化孢子不足')],'count'),
+         'enabled_when':'evolve_blue_monsters','indent':18},
+        {**number('blue_evolution_count','进化只数',1,999999),'min':1,
+         'enabled_when':'blue_evolution_mode','enabled_value':'count','indent':18},
         flag('clear_bag_notifications','清除背包新物品感叹号',True),
         flag('challenge_abyss','深渊先遣',False),
     ]},
-    'finish':{'hint':'全部任务完成并保存记录后关闭；遇到失败或手动停止时保留现场。',
+    'finish':{'hint':'保存记录后结束关闭。默认仅全部完成时关闭；可允许部分完成后关闭，但手动停止、设备异常和未知页面仍保留现场。',
               'fields':[flag('close_mumu','关闭MuMu模拟器',True),
-                        {**flag('close_app','关闭超二收菜',True),'notice':'关闭后可能无法看到捕捉怪兽的信息；可在运行记录中查看。'}]},
+                        {**flag('close_app','关闭超二收菜',True),'notice':'关闭后可能无法看到捕捉怪兽的信息；可在运行记录中查看。'},
+                        {**flag('close_on_partial','部分任务未完成也关闭',False),'description':'全部任务已处理且确认返回世界后关闭；手动停止和未知页面除外。'}]},
 }
+
+for _task,_spec in SPECS.items():
+    _fields=_spec['fields']
+    _team_index=next((i for i,f in enumerate(_fields) if f['key'] in ('teams','team')),None)
+    if _team_index is not None:_fields.insert(_team_index+1,wall_spec('attack' if _task=='nest' else 'ignore'))
+SPECS['triad']['fields'].insert(0,wall_spec())
+_giant_teams=next(i for i,f in enumerate(SPECS['celebration']['fields']) if f['key']=='giant_teams')
+SPECS['celebration']['fields'].insert(_giant_teams+1,{**wall_spec(),'key':'giant_wall_mode','enabled_when':'giant','indent':18})
 
 # Related settings are folded under their subtask's switch in the frontend.
 # Keep the option keys and dependencies unchanged for existing templates.
 OTHER_SETTING_GROUPS = {
     'friend_management': ('friend_management','exchange_friend_coins','remove_inactive_friends','inactive_days','auto_add_friends'),
+    'daily_core_upgrade': ('daily_core_upgrade','daily_core_order'),
     'buy_star_spores': ('buy_star_spores','convert_star_souls','evolve_blue_for_star_souls','buy_blue_eggs_for_star_souls','buy_all_blue_eggs','star_egg_target'),
     'open_monster_boxes': ('open_monster_boxes','monster_box_mode','monster_box_target','monster_box_limit'),
+    'evolve_blue_monsters': ('evolve_blue_monsters','blue_evolution_mode','blue_evolution_count'),
 }
 for field in SPECS['other']['fields']:
     field['compact'] = True
@@ -225,6 +260,8 @@ def normalize_settings(raw):
     out=deepcopy(raw)
     from .cocoon_settings import migrate_resource_limits
     migrate_resource_limits(out)
+    from .rampage_settings import migrate_repeat_challenge
+    migrate_repeat_challenge(out)
     from .wild_settings import wild_options,wild_switch
     from .merchant_settings import merchant_options
     from .free_summon import free_summon_enabled
@@ -259,6 +296,7 @@ def normalize_settings(raw):
     for task,spec in SPECS.items():
         saved=options.setdefault(task,{})
         if not isinstance(saved,dict):raise ValueError(f'{task} 设置格式错误')
+        if task=='main':saved.pop('max_nodes',None)
         if task=='hunt':
             if 'team' not in saved:
                 previous=normalize_teams(saved.get('teams',[]))

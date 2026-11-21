@@ -78,7 +78,7 @@ def test_navigation_failures_are_recoverable(error):assert navigation_failure(er
 def test_spend_uncertainty_and_user_stop_are_not_replayed(error):assert not navigation_failure(error)
 
 
-def test_page_changed_returns_home_then_restarts_with_existing_counts(tmp_path):
+def test_page_changed_returns_home_without_replaying_task_or_erasing_counts(tmp_path):
     d=daily(tmp_path);d.b.tasker=object();d.b.controller=object();d.active_task='tribe'
     d.task_counts={'tribe':2};d.battles=2;calls=[];d.home=lambda:calls.append('home')
     def action():
@@ -86,16 +86,18 @@ def test_page_changed_returns_home_then_restarts_with_existing_counts(tmp_path):
         if calls==['task']:raise PageChanged('复制此配置')
         assert d.task_counts=={'tribe':2} and d.battles==2
         return 'finished'
-    assert d.with_page_recovery(action,'部落')=='finished'
-    assert calls==['task','home','task'] and d.report['page_recoveries'][0]['status']=='reentered'
+    d.tribe=action;d.execute_task('tribe')
+    assert calls==['task','home'] and not d.report.get('page_recoveries')
+    assert d.task_counts=={'tribe':2} and d.battles==2
+    assert d.report['tasks']['tribe']['status']=='blocked'
 
 
 def test_repeated_failure_is_bounded_without_erasing_ledger(tmp_path):
     d=daily(tmp_path);d.b.tasker=object();d.b.controller=object();d.active_task='rift'
     d.task_counts={'rift':2};homes=[];d.home=lambda:homes.append(1)
     def action():raise TaskBlocked('钥匙余额未读清')
-    with pytest.raises(TaskBlocked):d.with_page_recovery(action,'裂痕')
-    assert len(homes)==3 and d.task_counts=={'rift':2}
+    d.rift=action;d.execute_task('rift')
+    assert len(homes)==1 and d.task_counts=={'rift':2}
 
 
 def test_pending_key_spend_cannot_restart_task(tmp_path):

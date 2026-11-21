@@ -63,17 +63,17 @@ def test_map_choice_closes_only_the_observed_x(tmp_path):
     d.close_map_choice(s)
     assert calls==[(695,358)]
 
-def test_task_resumes_navigation_after_event_without_duplicate_ui_task(tmp_path):
+def test_task_interruption_skips_task_without_duplicate_ui_task(tmp_path):
     d=daily(tmp_path);calls=[];d.home=lambda:None;d.checkpoint=lambda:None
     def copies():
         calls.append('copies')
         if len(calls)==1:raise EncounterInterrupted('ambush handled')
         return '原任务已继续'
     d.copies=copies;d.execute_task('copies')
-    assert calls==['copies','copies'] and d.report['execution_order']==['copies']
-    assert d.report['tasks']['copies']['status']=='done'
+    assert calls==['copies'] and d.report['execution_order']==['copies']
+    assert d.report['tasks']['copies']['status']=='blocked'
 
-def test_pending_encounter_reopens_and_rechecks_same_team_after_event(tmp_path):
+def test_pending_encounter_does_not_reopen_after_interruption(tmp_path):
     d=daily(tmp_path,{'task_options':{'copies':{'teams':[1,2]}}})
     detail=captured('copy-current-detail');result=captured('v082-ambush-result');calls=[]
     d.select_team=lambda s,t:calls.append(('team',t)) or s
@@ -87,9 +87,9 @@ def test_pending_encounter_reopens_and_rechecks_same_team_after_event(tmp_path):
     d.battle=battle
     d.start_challenge=lambda *a:None
     def opener():calls.append(('open',));return detail
-    assert d.play_encounter('copies',opener,'地图体力20',lambda s:calls.append(('verify',)))
-    assert calls==[('open',),('team',1),('verify',),('open',),('team',1),('verify',)]
-    assert len(d.report['team_attempts'])==1 and d.report['team_attempts'][0]['task']=='copies'
+    with pytest.raises(EncounterInterrupted):d.play_encounter('copies',opener,'地图体力20',lambda s:calls.append(('verify',)))
+    assert calls==[('open',),('team',1),('verify',)]
+    assert not d.report.get('team_attempts')
 
 def test_copy_overlap_selects_matching_name_once_despite_transition_delay(tmp_path):
     d=daily(tmp_path);d.b.sleep=lambda _:None;d.read_copy_names=lambda s:s

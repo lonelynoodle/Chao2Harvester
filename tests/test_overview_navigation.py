@@ -37,6 +37,17 @@ def test_top_target_is_used_immediately_even_when_exploration_is_lower(tmp_path)
     assert swipes==[] and clicks==[((738,137),'前往永生之茧')]
 
 
+def test_stuck_world_card_retries_same_row_then_returns_to_world_map(tmp_path):
+    panel=screen(('玩法概览',70,456,105,30),('每日挑战',70,518,105,30),('世界关卡',374,412,116,28))
+    world=screen(('任务挑战',1190,40,80,24),('世界回响',1190,130,80,24),('3/183',520,12,70,26))
+    d,swipes,clicks,_=navigator(tmp_path,[panel]);returned=[]
+    d.resolve_path_event=lambda _:None
+    d.home=lambda s:returned.append(s) or world
+    assert d.enter_overview('^世界关卡$') is world
+    assert swipes==[] and returned==[panel]
+    assert [point for point,reason in clicks]==[(738,456),(738,459),(738,453),(738,459)]
+
+
 def test_misread_cocoon_overview_uses_local_confirmation_before_any_scroll(tmp_path):
     top=captured('v083-overview-cocoon');d,swipes,_,_=navigator(tmp_path,[top])
     reads=[];d.b.read_text_crop=lambda s,roi:reads.append(roi) or '永生之茧'

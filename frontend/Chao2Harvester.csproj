@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Chao2Harvester</AssemblyName>
     <ApplicationIcon>../assets/chao2.ico</ApplicationIcon>
-    <Version>0.9.66</Version>
+    <Version>0.9.67</Version>
     <Product>超二收菜</Product>
     <Title>超二收菜</Title>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

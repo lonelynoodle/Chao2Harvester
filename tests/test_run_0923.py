@@ -109,7 +109,7 @@ def test_donation_uses_left_count_currency_and_twenty_wan_only(tmp_path):
     assert shop.gold_donation_offer(d.b, s) is None
 
 
-def test_donation_disabled_completed_and_pending_never_click(tmp_path):
+def test_donation_disabled_or_current_page_says_done_never_click(tmp_path):
     d = daily(tmp_path); templates(d.b)
     d.day = {}
     d.open_tribe_donation = lambda:pytest.fail('Disabled donation opened')
@@ -119,12 +119,30 @@ def test_donation_disabled_completed_and_pending_never_click(tmp_path):
     d.open_tribe_donation = lambda:s
     d.b.click_at = lambda *a:pytest.fail('Duplicate donation')
     assert d.tribe_gold_donation()['count'] == 0
-    next(w for w in s.words if w.text == '剩余次数：0/1').text = '剩余次数：1/1'
-    with pytest.raises(TaskBlocked, match='已有金币捐献记录'):
-        d.tribe_gold_donation()
-    d.day = {'tribe_donation_pending': True}
-    with pytest.raises(TaskBlocked, match='未核实'):
-        d.tribe_gold_donation()
+@pytest.mark.parametrize('count,expected',[('1/1',1),('0/1',0)])
+def test_donation_uses_current_game_quota_and_ignores_old_account_records(tmp_path,count,expected):
+    d=daily(tmp_path)
+    d.options['other']['tribe_gold_donation']=True
+    d.day['tribe_gold_donated']=True
+    d.day['tribe_donation_pending']=True
+    d.save_state=lambda:pytest.fail('Do not save donation memory')
+    def donation_page(quota):
+        return screen(('支配核心',124,15,100,33),('消耗',150,571,58,30),
+                      ('消耗',978,571,58,30),('20万',272,571,56,29),
+                      ('剩余次数：'+quota,180,626,130,24),('剩余次数：5/5',970,626,130,24))
+    initial=donation_page(count)
+    d.open_tribe_donation=lambda:initial
+    frames=iter([donation_page('0/1')] if expected else [])
+    d.observe=lambda:next(frames)
+    d.b.match_template=lambda *a:True
+    d.b.read_text_crop=lambda *a:'581万'
+    clicks=[]
+    def click(s,point,anchors,reason):
+        assert s is initial
+        clicks.append(point)
+    d.b.click_at=click
+    assert d.tribe_gold_donation()['count']==expected
+    assert clicks==[(245,587)]*expected
 
 
 def shop_machine(d, monkeypatch, *, balance=60, fail_receipt=False):

@@ -11,6 +11,13 @@
  Icon="chao2.png" ShowTitle="True" WindowStartupLocation="CenterScreen"
  FontFamily="Microsoft YaHei UI" FontSize="13" Closing="OnClosing">
  <hc:Window.Resources>
+  <DataTemplate x:Key="LogHeaderTemplate">
+   <StackPanel Orientation="Horizontal">
+    <TextBlock Text="{Binding Time}" FontSize="11" Margin="0,0,7,0" Foreground="{DynamicResource TraceLogBrush}" />
+    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,8,0" />
+    <TextBlock Text="{Binding State}" Foreground="{Binding Foreground}" FontSize="12" />
+   </StackPanel>
+  </DataTemplate>
   <DataTemplate x:Key="OtherToolsTemplate">
         <StackPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
          <Expander x:Name="WildExpander" HorizontalContentAlignment="Stretch" Margin="0,0,0,2">
@@ -132,6 +139,11 @@
                 <Condition Binding="{Binding DataContext.Idle, RelativeSource={RelativeSource AncestorType=Window}}" Value="True" />
                </MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers>
               </Style></StackPanel.Style>
+              <Button x:Name="StartFromTaskButton" hc:IconElement.Geometry="{StaticResource StartFromTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}"
+               ToolTip="从此任务开始，按列表顺序执行后续已勾选任务" AutomationProperties.Name="{Binding Name, StringFormat=从{0}开始执行后续任务}"
+               Click="StartFromTaskClick" IsEnabled="{Binding Enabled}" />
+              <Button x:Name="RunOnlyTaskButton" hc:IconElement.Geometry="{StaticResource RunOnlyTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}"
+               ToolTip="仅运行本条任务；无需勾选，不执行后续任务" AutomationProperties.Name="{Binding Name, StringFormat=仅运行{0}}" Click="RunOnlyTaskClick" />
               <Button hc:IconElement.Geometry="{StaticResource CopyTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}" ToolTip="复制" Click="CopyQueueTaskClick"
                IsEnabled="{Binding DataContext.AllowRepeatTasks, RelativeSource={RelativeSource AncestorType=Window}}" />
               <Button hc:IconElement.Geometry="{StaticResource RenameTaskGeometry}" Style="{StaticResource TaskActionButtonStyle}" ToolTip="重命名" Click="RenameQueueTaskClick" />
@@ -174,9 +186,15 @@
        </Grid>
       </Border>
       <Grid Grid.Row="1" HorizontalAlignment="Center" Margin="0,10,0,0">
-       <Button x:Name="StartButton" Content="开始" Width="100" Height="50" Margin="5" Click="StartRun"
+       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+       <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0" Visibility="{Binding StartVisibility}">
+        <TextBlock Text="游戏版本" VerticalAlignment="Center" Margin="0,0,6,0" />
+        <ComboBox x:Name="GameVersionPicker" Width="70" ItemsSource="{Binding GameVersions}" SelectedItem="{Binding GameVersion, Mode=TwoWay}"
+         AutomationProperties.Name="游戏版本" />
+       </StackPanel>
+       <Button x:Name="StartButton" Grid.Column="1" Content="开始" Width="100" Height="50" Margin="5" Click="StartRun"
         Foreground="{DynamicResource PrimaryTextBrush}" Visibility="{Binding StartVisibility}" />
-       <Button x:Name="StopButton" Content="停止" Width="100" Height="50" Margin="5" Click="StopRun"
+       <Button x:Name="StopButton" Grid.ColumnSpan="2" Content="停止" Width="100" Height="50" Margin="5" Click="StopRun"
         Visibility="{Binding StopVisibility}" IsEnabled="{Binding CanStop}" />
       </Grid>
      </Grid>
@@ -193,28 +211,20 @@
       <DockPanel>
        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" Foreground="{DynamicResource PrimaryBrush}" />
       </DockPanel>
-      <hc:ScrollViewer x:Name="LogScroll" Grid.Row="1" Margin="0,8,0,8" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsInertiaEnabled="True" PanningMode="Both">
+      <Grid Grid.Row="1" Margin="0,4,0,6">
+      <hc:ScrollViewer x:Name="LogScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsInertiaEnabled="True" PanningMode="Both" ScrollChanged="LogScrollChanged" LayoutUpdated="LogLayoutUpdated">
        <ItemsControl x:Name="LogList" ItemsSource="{Binding LogGroups}">
         <ItemsControl.ItemTemplate>
          <DataTemplate>
-          <Expander Header="{Binding}" IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,3,0,5" HorizontalContentAlignment="Stretch">
-           <Expander.HeaderTemplate>
-            <DataTemplate>
-             <StackPanel Orientation="Horizontal">
-              <TextBlock Text="{Binding Time}" FontSize="11" Margin="0,0,8,0" Foreground="{DynamicResource TraceLogBrush}" />
-              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,10,0" />
-              <TextBlock Text="{Binding State}" Foreground="{Binding Foreground}" FontSize="12" />
-             </StackPanel>
-            </DataTemplate>
-           </Expander.HeaderTemplate>
-           <ItemsControl ItemsSource="{Binding Lines}" Margin="6,1,0,5">
+          <Expander Header="{Binding}" HeaderTemplate="{StaticResource LogHeaderTemplate}" IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,1,0,2" HorizontalContentAlignment="Stretch">
+           <ItemsControl ItemsSource="{Binding Lines}" Margin="4,0,0,2">
             <ItemsControl.ItemTemplate>
              <DataTemplate>
               <!-- Preserve MAA's timestamp, colored text and wrapping inside each task. -->
-              <Grid>
+              <Grid Background="{Binding Background}" ToolTip="{Binding TimeRange}">
                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-               <TextBlock Text="{Binding Time}" Margin="0,5,10,5" Foreground="{DynamicResource TraceLogBrush}" VerticalAlignment="Top" />
-               <TextBlock Grid.Column="1" Margin="0,5" Text="{Binding Text}" Foreground="{Binding Foreground}" FontWeight="{Binding Weight}" TextWrapping="Wrap" VerticalAlignment="Top" />
+               <TextBlock Text="{Binding LastTime}" FontSize="11" Margin="0,2,7,2" Foreground="{DynamicResource TraceLogBrush}" VerticalAlignment="Top" />
+               <local:LogMessageView Grid.Column="1" Margin="0,2" Line="{Binding}" TextWrapping="Wrap" VerticalAlignment="Top" />
               </Grid>
              </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -224,6 +234,16 @@
         </ItemsControl.ItemTemplate>
        </ItemsControl>
       </hc:ScrollViewer>
+      <Border x:Name="StickyLogHeader" VerticalAlignment="Top" Panel.ZIndex="10" Visibility="Collapsed" Margin="0,0,16,0" Background="{DynamicResource RegionBrush}">
+       <Button x:Name="CollapseStickyLogButton" Click="CollapseStickyLog" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="7,4" ToolTip="收起此任务的运行详情" AutomationProperties.Name="收起当前展开任务">
+        <Grid>
+         <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="18" /></Grid.ColumnDefinitions>
+         <ContentControl Content="{Binding}" ContentTemplate="{StaticResource LogHeaderTemplate}" />
+         <TextBlock Grid.Column="1" Text="⌃" HorizontalAlignment="Right" VerticalAlignment="Center" />
+        </Grid>
+       </Button>
+      </Border>
+      </Grid>
       <TextBlock Grid.Row="2" Text="{Binding ResourceSummary}" TextWrapping="Wrap" Foreground="{DynamicResource SecondaryTextBrush}" />
      </Grid>
     </Grid>
@@ -269,7 +289,11 @@
       </TabItem>
       <TabItem Header="打开游戏">
        <StackPanel Margin="10,22,10,0">
-        <TextBlock Text="启动已配置的 MuMu 和超进化物语2。" TextWrapping="Wrap" Margin="0,0,0,16" />
+        <StackPanel Orientation="Horizontal" IsEnabled="{Binding Idle}" Margin="0,0,0,16">
+         <TextBlock Text="游戏版本" VerticalAlignment="Center" Margin="0,0,8,0" />
+         <ComboBox x:Name="LaunchGameVersionPicker" Width="78" ItemsSource="{Binding GameVersions}" SelectedItem="{Binding GameVersion, Mode=TwoWay}"
+          AutomationProperties.Name="游戏版本" />
+        </StackPanel>
         <Button Content="打开超二" Click="LaunchGame" IsEnabled="{Binding Idle}" HorizontalAlignment="Left" />
        </StackPanel>
       </TabItem>
@@ -295,7 +319,7 @@
        <ItemsControl ItemsSource="{Binding ToolLogs}"><ItemsControl.ItemTemplate><DataTemplate>
         <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="64" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
          <TextBlock Text="{Binding Time}" Foreground="{DynamicResource SecondaryTextBrush}" />
-         <TextBlock Grid.Column="1" Text="{Binding Text}" Foreground="{Binding Foreground}" TextWrapping="Wrap" />
+         <TextBlock Grid.Column="1" Text="{Binding DisplayText}" Foreground="{Binding Foreground}" TextWrapping="Wrap" />
         </Grid>
        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
       </hc:ScrollViewer>

@@ -29,7 +29,7 @@ public class TaskItem(string key, string name, string description, bool enabled)
     public IEnumerable<TaskOptionSection> OtherSections => Options.Where(o=>o.Key!="challenge_abyss")
         .GroupBy(o=>o.Group).Select(g=>new TaskOptionSection(g));
     public TaskOption? AbyssOption=>Options.FirstOrDefault(o=>o.Key=="challenge_abyss");
-    public IEnumerable<TaskOption> ForestBasicOptions => Options.Where(o=>o.Key is "teams" or "reserve_points" or "max_explorations" or "collect_resources");
+    public IEnumerable<TaskOption> ForestBasicOptions => Options.Where(o=>o.Key is "teams" or "wall_mode" or "reserve_points" or "max_explorations" or "collect_resources");
     public IEnumerable<TaskOption> ForestAdvancedOptions => Options.Where(o=>o.Key!="mode");
     public int ForestModeIndex
     {
@@ -53,12 +53,6 @@ public class TaskItem(string key, string name, string description, bool enabled)
     public event PropertyChangedEventHandler? PropertyChanged;
     private void Changed([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
 }
-public record LogLine(string Time, string Text, string Color = "MessageLogBrush")
-{
-    public Brush Foreground => (Brush)Application.Current.FindResource(Color);
-    public FontWeight Weight => Color=="ErrorLogBrush"?FontWeights.SemiBold:FontWeights.Normal;
-}
-
 public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyChanged
 {
     private T OtherToolPart<T>(string name) where T:FrameworkElement=>VisualDescendants((FrameworkElement)TaskOptions.OtherContent!)
@@ -138,6 +132,18 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
     public Visibility TaskSettingsVisibility=>SelectedTask is null?Visibility.Collapsed:Visibility.Visible;
     public string Adb { get; set; }
     public string Address { get; set; }
+    public IReadOnlyList<string> GameVersions { get; } = ["1.86", "1.88"];
+    private string gameVersion = "1.86";
+    public string GameVersion
+    {
+        get => gameVersion;
+        set
+        {
+            if (gameVersion == value || !GameVersions.Contains(value)) return;
+            gameVersion = value;
+            Changed();
+        }
+    }
     public bool AutoThreeShots { get; set; }
     public bool FollowRunningTask { get; set; }
     public bool UnorderedTasks { get; set; }
@@ -168,6 +174,8 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             cocoon["daily_tasks"] ??= JsonValue.Create(oldTargets.Any(r=>r?["id"]?.ToString().StartsWith("lower_")==true && r["enabled"]?.GetValue<bool>()!=false));
         Adb = settings["adb"]?.GetValue<string>() ?? "";
         Address = settings["address"]?.GetValue<string>() ?? "127.0.0.1:16384";
+        if (settings["game_version"] is JsonValue savedVersion && savedVersion.TryGetValue<string>(out var version) && version is not null)
+            GameVersion = version;
         var toolSpecs=JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"tools.json")))!.AsArray();
         InitializeTriggerEvents(toolSpecs);
         var wildSpec=toolSpecs.First(t=>t!["key"]!.GetValue<string>()=="wild_capture")!;
@@ -234,6 +242,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         freeSummonSettingsReady=true;
         triggerSettingsReady=true;
         if (App.Smoke) Loaded += async (_, _) => await RunSmoke();
+        else if(App.RunRequested)Loaded+=async (_,_)=>await Begin("run");
     }
 
     private void Append(string message,string color="MessageLogBrush")
@@ -243,7 +252,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         runLogs.Append(line);activeRun?.Log(line.Time,message,color);
         if(currentMode!="run")
         {
-            ToolLogs.Add(new(DateTime.Now.ToString("HH:mm:ss"),message,color));
+            LogLine.AppendTo(ToolLogs,new(line.Time,message,color));
             while(ToolLogs.Count>300)ToolLogs.RemoveAt(0);
             Dispatcher.InvokeAsync(()=>ToolLogScroll.ScrollToEnd(),DispatcherPriority.Background);
         }
@@ -434,6 +443,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         settings["wild_capture_enabled"]=WildCaptureEnabled;
         settings["adb"] = Adb.Trim();
         settings["address"] = Address.Trim();
+        settings["game_version"] = GameVersion;
         settings.Remove("max_battles");
         settings["close_mumu"] = false; // Closing is configured only through the visible finish task.
         settings["tasks"] = Keys(Tasks.Where(t=>t.Enabled).Select(t=>t.Key).Distinct());
@@ -462,6 +472,18 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         catch (Exception exc) { MessageBox.Show(this, exc.Message, "设置未保存"); }
     }
     private void StartRun(object sender, RoutedEventArgs e) => _ = Begin("run");
+    private void StartFromTaskClick(object sender, RoutedEventArgs e)
+    {
+        if(!Idle || sender is not FrameworkElement { DataContext:TaskItem item } || !item.Enabled || !Tasks.Contains(item))return;
+        SelectedTask=item;
+        _ = Begin("run", fake:App.Smoke, startFrom:item.InstanceId);
+    }
+    private void RunOnlyTaskClick(object sender,RoutedEventArgs e)
+    {
+        if(!Idle || sender is not FrameworkElement {DataContext:TaskItem item} || !Tasks.Contains(item))return;
+        SelectedTask=item;
+        _ = Begin("run",fake:App.Smoke,onlyTask:item.InstanceId);
+    }
     private void Diagnose(object sender, RoutedEventArgs e) => _ = Begin("diagnostic");
     private void LaunchGame(object sender, RoutedEventArgs e) => _ = Begin("launch");
     private void StartPuzzle(object sender, RoutedEventArgs e) => _ = Begin("puzzle");
@@ -476,7 +498,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         catch (IOException exc) { Append("停止通道已关闭：" + exc.Message); }
     }
 
-    private async Task Begin(string mode, bool fake = false)
+    private async Task Begin(string mode, bool fake = false, string? startFrom = null,string? onlyTask = null)
     {
         if (!Idle) return;
         if (fake && !App.Smoke) throw new InvalidOperationException("测试通道只能用于离线检查");
@@ -502,7 +524,16 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             Save();
             if (!fake && !File.Exists(Adb.Trim())) throw new InvalidOperationException("请在设置中填写 MuMu adb.exe 路径。");
             var selected = Tasks.Where(t => t.Enabled).Select(t => t.Key).Distinct().ToArray();
+            var targetId=onlyTask??startFrom;
+            var firstTask=targetId is null?null:Tasks.FirstOrDefault(t=>t.InstanceId==targetId);
+            if(onlyTask is not null)
+            {
+                if(mode!="run" || startFrom is not null || firstTask is null)throw new InvalidOperationException("请选择一条有效任务运行。");
+                selected=[firstTask.Key];
+            }
             if (mode == "run" && selected.Length == 0) throw new InvalidOperationException("请至少勾选一项任务。");
+            if(startFrom is not null && (mode!="run" || firstTask is null || !firstTask.Enabled))
+                throw new InvalidOperationException("请从列表中已勾选的任务开始。");
             string python = Path.Combine(App.Root, "runtime", "python", "python.exe");
             if (!File.Exists(python)) python = Path.Combine(App.Root, ".venv", "Scripts", "python.exe");
             if (!File.Exists(python)) throw new InvalidOperationException("缺少 Python 运行环境，请下载完整发布包，或按 README 配置源码运行环境。");
@@ -525,11 +556,15 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             abortReason=null;lastWorkerError=null;stopRequested=null;lastFeedback=Stopwatch.GetTimestamp();
             currentPhase="正在启动后台";Status=currentPhase;
             Append(mode switch { "puzzle"=>"正在连接并读取已打开的拼二棋盘…", "tour"=>"正在连接并开始幻境巡游…", "abyss"=>"正在连接并检查深渊先遣…", "diagnostic"=>"开始只读检测，正在连接模拟器…", "launch"=>"正在打开 MuMu 和超二…", _=>"开始执行，正在连接模拟器…" },"InfoLogBrush");
-            foreach (var task in Tasks) task.State = "待执行";
+            if(firstTask is not null)Append(onlyTask is not null?$"仅运行「{firstTask.Name}」，完成后结束本轮。":$"从「{firstTask.Name}」开始，按列表顺序执行后续已勾选任务。","InfoLogBrush");
+            int firstIndex=firstTask is null?0:Tasks.IndexOf(firstTask);
+            for(int i=0;i<Tasks.Count;i++)Tasks[i].State=onlyTask is not null
+                ?Tasks[i].InstanceId==onlyTask?"待执行":Tasks[i].Enabled?"本轮跳过":"未启用"
+                :i<firstIndex?"本轮跳过":Tasks[i].Enabled?"待执行":"未启用";
             worker.Start();
             Task output = ReadEvents(worker.StandardOutput);
             Task errors = ReadErrors(worker.StandardError,activeRun.Folder);
-            await worker.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { mode, settings, selected }));
+            await worker.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { mode, settings, selected, start_from=startFrom,only_task=onlyTask }));
             await worker.StandardInput.FlushAsync();
             monitor=MonitorWorker(worker,monitorStop.Token);
             await worker.WaitForExitAsync();
@@ -660,7 +695,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             activeRun?.SaveResult(data);
             receivedResult = true;
             string code = data.GetProperty("status").GetString() ?? "";
-            closeAfterResult=currentMode=="run" && code=="completed" &&
+            closeAfterResult=currentMode=="run" && (code is "completed" or "partial") &&
                 data.TryGetProperty("close_app_requested",out var close) && close.ValueKind==JsonValueKind.True;
             Status = code switch { "completed" => "本轮完成", "partial" => "部分完成", "blocked" when currentPhase.StartsWith("正在连接 MuMu") => "连接失败", "blocked" => "已安全停止", "stopped" => "已停止", "diagnostic" => "检测完成", "launched" => "游戏已启动", _ => "已结束" };
             runLogs.Finish(Status);
@@ -719,7 +754,15 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         {
             if (Tasks.Count != 17 || Tasks[0].Key!="startup" || new[]{"forest","rift","tribe","exploration","origin","arena","nest","celebration","other"}.Any(k=>!Tasks.Any(t=>t.Key==k)) || Tasks.Any(t=>t.Key is "idle" or "overview" or "daily_rewards" or "three_shots" or "giant" or "triad") || !Idle || StartButton.Visibility != Visibility.Visible || StopButton.Visibility != Visibility.Collapsed)
                 throw new Exception("初始界面状态错误");
+            if (!GameVersionPicker.IsVisible || (string?)GameVersionPicker.SelectedItem != "1.86" || GameVersionPicker.Items.Count != 2)
+                throw new Exception("游戏版本选择初始状态错误");
+            GameVersionPicker.SelectedItem = "1.88";
+            Save();
+            if (GameVersion != "1.88" || settings["game_version"]?.GetValue<string>() != "1.88")
+                throw new Exception("所选游戏版本未保存");
+            GameVersionPicker.SelectedItem = "1.86";
             await SmokeTaskTemplates();
+            await SmokeContinueFromTask();
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
             await Task.Delay(250);
             Capture("wpf-main.png");
@@ -765,7 +808,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             SelectedTask=Tasks.First(t=>t.Key=="hunt");
             await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
             var huntTeam=SelectedTask.Options.Single(o=>o.Key=="team");
-            var huntTeamBox=VisualDescendants(TaskOptions).OfType<System.Windows.Controls.ComboBox>().Single(b=>b.IsVisible);
+            var huntTeamBox=VisualDescendants(TaskOptions).OfType<System.Windows.Controls.ComboBox>().Single(b=>b.IsVisible && ReferenceEquals(b.DataContext,huntTeam));
             if(huntTeam.ChoiceId!="2" || huntTeam.Choices.Count!=5 ||
                 SelectedTask.Options.Any(o=>o.Key is "teams" or "max_runs") ||
                 VisualDescendants(TaskOptions).OfType<System.Windows.Controls.Button>().Any(b=>b.IsVisible && b.Content?.ToString()=="添加队伍"))
@@ -899,7 +942,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             var forestStrategy=SelectedTask.Options.First(o=>o.Key=="strategy");
             var forestReserve=SelectedTask.Options.First(o=>o.Key=="reserve_points");
             var forestPriority=SelectedTask.Options.First(o=>o.Key=="node_priority");
-            if(SelectedTask.ForestModeIndex!=0 || SelectedTask.ForestBasicOptions.Count()!=4 ||
+            if(SelectedTask.ForestModeIndex!=0 || SelectedTask.ForestBasicOptions.Count()!=5 ||
                 !SelectedTask.ForestAdvancedOptions.Contains(forestPriority) ||
                 new TaskOption(manifestFor("forest","strategy"),null).ChoiceId!="overflow" ||
                 new TaskOption(manifestFor("forest","reserve_points"),null).Number!=0 || forestPriority.Rows.Count!=7)
@@ -945,7 +988,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             CheckInlineOptions();Capture("wpf-arena-settings.png");
             foreach(var key in new[]{"origin","arena"})
                 if(!new TaskOption(manifestFor(key,"teams"),null).Teams.Select(t=>t.TeamId).SequenceEqual(new[]{2}))throw new Exception("PvP默认队伍错误");
-            if(new TaskOption(manifestFor("nest","max_runs"),null).Number!=1)throw new Exception("暴走旷野默认次数错误");
+            if(new TaskOption(manifestFor("nest","repeat_challenge"),null).Checked)throw new Exception("暴走旷野默认不重复挑战");
             SelectedTask=Tasks.First(t=>t.Key=="tower");
             var towers=SelectedTask.Options.First(o=>o.Key=="towers");
             var feathers=SelectedTask.Options.First(o=>o.Key=="reserve_feathers");feathers.Number=5;Save();
@@ -1029,6 +1072,19 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             if(boxTarget.IsAvailable)throw new Exception("随机开茧不应启用指定怪兽");
             boxMode.ChoiceId="balanced";boxes.Checked=false;boxLimit.Number=0;boxTarget.ChoiceId="暴龙";Save();
             if(boxMode.IsAvailable||boxTarget.IsAvailable||boxLimit.IsAvailable)throw new Exception("关闭开茧后的前置条件未禁用");
+            var purpleEvolution=SelectedTask.Options.First(o=>o.Key=="evolve_blue_monsters");
+            var purpleMode=SelectedTask.Options.First(o=>o.Key=="blue_evolution_mode");
+            var purpleCount=SelectedTask.Options.First(o=>o.Key=="blue_evolution_count");
+            if(purpleEvolution.Checked||purpleMode.IsAvailable||purpleCount.IsAvailable||purpleMode.ChoiceId!="count"||purpleCount.Number!=1)
+                throw new Exception("蓝怪进化紫怪默认开关或依赖错误");
+            purpleEvolution.Checked=true;purpleCount.Number=3;Save();
+            if(!purpleMode.IsAvailable||!purpleCount.IsAvailable||settings["task_options"]!["other"]!["blue_evolution_count"]!.GetValue<int>()!=3)
+                throw new Exception("指定进化只数未启用或保存");
+            purpleMode.ChoiceId="until_empty";Save();
+            if(purpleCount.IsAvailable||settings["task_options"]!["other"]!["blue_evolution_mode"]!.GetValue<string>()!="until_empty")
+                throw new Exception("材料耗尽模式仍允许设置只数或未保存");
+            purpleMode.ChoiceId="count";purpleEvolution.Checked=false;purpleCount.Number=1;Save();
+            if(purpleMode.IsAvailable||purpleCount.IsAvailable)throw new Exception("关闭进化后依赖未禁用");
             if(!contractRewards.Checked || SelectedTask.Options.IndexOf(contractRewards)>=SelectedTask.Options.IndexOf(bagClear))throw new Exception("契约任务默认值或顺序错误");
             if(friendDays.Number!=5 || friendPrune.Checked || !bagClear.Checked)throw new Exception("其他任务默认值错误");
             friendMaster.Checked=true;friendPrune.Checked=false;
@@ -1076,10 +1132,18 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             Pages.SelectedIndex=0;
             SelectedTask=Tasks.First(t=>t.Key=="nest");
             var buffs=SelectedTask.Options.First(o=>o.Key=="buff_priority");
+            var wall=SelectedTask.Options.Single(o=>o.Key=="wall_mode");
+            if(wall.ChoiceId!="attack" || wall.Choices.Count!=3)throw new Exception("暴走战墙默认值或选项错误");
+            wall.ChoiceId="defense";Save();
+            if(settings["task_options"]!["nest"]!["wall_mode"]!.ToString()!="defense" ||
+                settings["task_queue"]!.AsArray().First(t=>t!["key"]!.ToString()=="nest")!["options"]!["wall_mode"]!.ToString()!="defense")
+                throw new Exception("战墙设置未随任务实例保存");
+            wall.ChoiceId="attack";Save();
             if(buffs.Rows.Count!=12)throw new Exception("旷野增益选项缺失");
             await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("wpf-rampage-priority.png");
             SelectedTask=Tasks.First(t=>t.Key=="finish");
-            if(Tasks.Last().Key!="finish" || SelectedTask.Options.Any(o=>!o.Checked))throw new Exception("结束关闭设置错误");
+            if(Tasks.Last().Key!="finish" || SelectedTask.Options.Where(o=>o.Key!="close_on_partial").Any(o=>!o.Checked) ||
+                SelectedTask.Options.Single(o=>o.Key=="close_on_partial").Checked)throw new Exception("结束关闭设置错误");
             await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);Capture("wpf-finish.png");
             var celebrations=Tasks.First(t=>t.Key=="celebration");
             if(!celebrations.Options.First(o=>o.Key=="triad").Checked ||
@@ -1286,7 +1350,10 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             var listed=other.OtherSections.SelectMany(s=>new[]{s.Toggle}.Concat(s.Details)).Select(o=>o.Key).Append("challenge_abyss").ToArray();
             if(listed.Length!=other.Options.Count||listed.Distinct().Count()!=listed.Length)throw new Exception("其他任务折叠后遗漏或重复设置");
             var sections=VisualDescendants(TaskOptions).OfType<System.Windows.Controls.Expander>().Where(e=>e.Visibility==Visibility.Visible && e.DataContext is TaskOptionSection).ToArray();
-            if(sections.Length!=3||sections.Any(e=>e.IsExpanded))throw new Exception("其他任务分组或默认折叠状态错误");
+            var expectedGroups=other.OtherSections.Where(s=>s.Details.Any()).Select(s=>s.Toggle.Key).ToHashSet();
+            var renderedGroups=sections.Select(e=>((TaskOptionSection)e.DataContext).Toggle.Key);
+            if(sections.Length!=expectedGroups.Count||!expectedGroups.SetEquals(renderedGroups)||sections.Any(e=>e.IsExpanded))
+                throw new Exception("其他任务分组或默认折叠状态错误");
             Capture("wpf-other-collapsed.png");
             var friends=sections.Single(e=>((TaskOptionSection)e.DataContext).Toggle.Key=="friend_management");
             other.Options.Single(o=>o.Key=="friend_management").Checked=true;
@@ -1349,7 +1416,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
             if(!Idle||Status!="已停止"||!Logs.Any(l=>l.Text.Contains("连续2秒没有反馈")))throw new Exception("无反馈超时未解除运行状态");
             Capture("wpf-feedback-timeout.png");
             await CheckLogGroups();
-            File.WriteAllText(Path.Combine(App.DiagnosticsRoot,"wpf-smoke.json"), JsonSerializer.Serialize(new { status = "passed", tasks = Tasks.Count, bridge = "passed", stop = "passed", timeout="passed", fixed_columns="passed", gear_selection="passed", dynamic_teams = "passed", dynamic_dungeons="passed", daily_checkbox="passed", dependent_options="passed", task_follow="passed", overview_order="passed", inline_options="passed", team_button_left="passed", reward_labels="passed", tribe_settings="passed", other_settings="passed", other_collapsible="passed", other_tool_migration="passed", resource_reserves="passed", resource_feedback="passed", refill_setting = "passed", log_groups="passed", log_history_limit="passed", log_reset="passed", run_folders="passed", tools_page="passed", puzzle_feedback="passed", puzzle_goals="passed", tour_tool="passed", triad_auto_settle="passed", no_game_input = true }));
+            File.WriteAllText(Path.Combine(App.DiagnosticsRoot,"wpf-smoke.json"), JsonSerializer.Serialize(new { status = "passed", tasks = Tasks.Count, bridge = "passed", continue_from_task="passed", stop = "passed", timeout="passed", fixed_columns="passed", gear_selection="passed", dynamic_teams = "passed", dynamic_dungeons="passed", daily_checkbox="passed", dependent_options="passed", task_follow="passed", overview_order="passed", inline_options="passed", team_button_left="passed", reward_labels="passed", tribe_settings="passed", other_settings="passed", other_collapsible="passed", other_tool_migration="passed", resource_reserves="passed", resource_feedback="passed", refill_setting = "passed", log_groups="passed", log_history_limit="passed", log_reset="passed", run_folders="passed", tools_page="passed", puzzle_feedback="passed", puzzle_goals="passed", tour_tool="passed", triad_auto_settle="passed", no_game_input = true }));
         }
         catch (Exception exc)
         {
@@ -1418,6 +1485,7 @@ public partial class MainWindow : HandyControl.Controls.Window, INotifyPropertyC
         if(!copies.IsExpanded || copies.Lines.Count!=4)throw new Exception("结束后不能展开完整详情");
         await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
         LogScroll.ScrollToTop();Capture("wpf-task-log-groups.png");
+        await CheckCompactLogDetails();
     }
     private static JsonNode manifestFor(string task,string field)=>JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"tasks.json")))!.AsArray().First(t=>t!["key"]!.ToString()==task)!["settings"]!["fields"]!.AsArray().First(f=>f!["key"]!.ToString()==field)!;
     private void CheckInlineOptions()

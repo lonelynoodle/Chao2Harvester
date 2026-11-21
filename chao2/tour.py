@@ -5,7 +5,7 @@ import re
 import numpy as np
 from PIL import Image
 from .backend import Backend
-from .policy import TaskBlocked,UserStopped,FightLost,parse_ratio
+from .policy import TaskBlocked,UserStopped,FightLost,BattleReturned,parse_ratio
 from .other_tasks import components
 from .workflows import Daily,is_world,create_report,write_report
 from .tool_settings import tour_options
@@ -239,7 +239,7 @@ class TourPlayer(Daily):
             if kind=='story':
                 s=self.story(detail,number)
             elif tour_detail(detail):
-                won=False
+                won=False;unknown_result=False
                 for team in self.tool_options['teams'] or [None]:
                     if self.battles>=self.limit:break
                     if team!=self.last_team:
@@ -249,14 +249,17 @@ class TourPlayer(Daily):
                     self.start_challenge('tour',detail,'幻境巡游免费',lambda q:verify_free_tour(self.b,q,number));row['battles']+=1
                     try:result=self.battle('幻境巡游免费');outcome='victory'
                     except FightLost as lost:result=lost.screen;outcome='failed'
+                    except BattleReturned as returned:result=returned.screen;outcome='unobserved';unknown_result=True
                     self.report.setdefault('team_attempts',[]).append({'task':'tour','environment':card['name'],'stage':number,'team':team,'outcome':outcome})
                     if outcome=='victory':row['wins']+=1
                     self.exit_result(result);s=self.map_page()
                     if outcome=='victory':won=True;break
+                    progress=tour_progress(s)
+                    if outcome=='unobserved' and progress and progress[0]>=number:won=True;break
                     if team!=(self.tool_options['teams'] or [None])[-1] and self.battles<self.limit:
                         detail,_=self.open_next(s,number)
                 if not won:
-                    row['reason']='达到挑战上限' if self.battles>=self.limit else f'第{number}关全部阵容未通过'
+                    row['reason']='达到挑战上限' if self.battles>=self.limit else f'第{number}关胜败未观察到，当前进度未推进' if unknown_result else f'第{number}关全部阵容未通过'
                     self.note(card['name']+'：'+row['reason']);break
             else:
                 self.b.save_screen(detail,self.report['folder']/f'tour-node-{number}.png')
@@ -324,7 +327,8 @@ def run_tour(settings,stop,log=print,emit=lambda *a:None):
     def audit(action):
         with (report['folder']/'actions.jsonl').open('a',encoding='utf-8') as f:
             f.write(json.dumps({'time':datetime.now().astimezone().isoformat(),**action},ensure_ascii=False)+'\n')
-    b=Backend(settings,stop,log,lambda m:emit('phase',m),audit);player=TourPlayer(b,report,emit)
+    b=Backend(settings,stop,log,lambda m:emit('phase',m),audit,recover_gold_details=True)
+    player=TourPlayer(b,report,emit)
     try:
         b.connect();emit('phase','幻境巡游运行中');report['reason']=player.play()
         report['status']='completed' if report.get('all_environments_checked') and not report.get('incomplete_environments') else 'partial'

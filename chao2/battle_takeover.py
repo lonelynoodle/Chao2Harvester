@@ -70,13 +70,12 @@ class BattleTakeover:
         self.checkpoint()
         # Rampage and multi-round fights can outlast the normal 240s timeout.
         timeout=max(720,int(self.b.settings.get('battle_timeout_seconds',240))) if timeout_seconds is None else timeout_seconds
-        until=time.monotonic()+timeout
         feedback=time.monotonic();network_retries=0
         try:
-            while time.monotonic()<until:
+            for s in self.battle_frames(timeout,'已有战斗',first=s,observe=self.observe,clock=time.monotonic):
                 self.b.guard(s)
                 if self.retry_battle_network(s,network_retries):
-                    network_retries+=1;s=self.observe();continue
+                    network_retries+=1;continue
                 phase=takeover_phase(s)
                 if phase=='result':
                     row['result']=existing_result(s)
@@ -99,19 +98,7 @@ class BattleTakeover:
                         '已有部落战斗成绩进入奖励页',timeout=4,retry_navigation=advance)
                     continue
                 if phase=='rampage_buff':
-                    button,description=rampage_buff(s,self.options['nest']['buff_priority'])
-                    source=s.region_text((0,150,1280,470))
-                    def choose(q):
-                        if takeover_phase(q)=='rampage_buff' and q.region_text((0,150,1280,470))==source:
-                            button,description=rampage_buff(q,self.options['nest']['buff_priority'])
-                            self.b.click_at(q,button.center,['请选择一个暴走增益','^点击选择$'],
-                                            '接续已有暴走旷野，选择增益：'+description)
-                    choose(s)
-                    self.note('已有暴走旷野已选择增益，继续等待本场结束')
-                    s=self.wait_for_screen(lambda q:(takeover_phase(q) not in (None,'rampage_buff') or
-                        exit_destination(q) is not None or (takeover_phase(q)=='rampage_buff' and
-                        q.region_text((0,150,1280,470))!=source)),
-                        '已有暴走旷野增益选择完成',timeout=4,retry_navigation=choose)
+                    s=self.choose_rampage_buff(s)
                     continue
                 if phase in ('round','paused'):
                     pattern=NEXT_ROUND if phase=='round' else '^继续战斗$|^继续游戏$|^继续$'
@@ -137,8 +124,7 @@ class BattleTakeover:
                 if time.monotonic()-feedback>=15:
                     self.note('已有场次'+('正在匹配' if phase=='matching' else '进行中或结算加载中')+'，等待结束后继续任务…')
                     feedback=time.monotonic()
-                self.b.sleep(1);s=self.observe()
-            raise TaskBlocked('已有战斗等待结算超时，保留现场；未撤退、未重复开战')
+                self.b.sleep(1)
         except (SafetyStop,TaskBlocked,UserStopped) as error:
             row.update(status='stopped' if isinstance(error,UserStopped) else 'blocked',reason=str(error))
             self.checkpoint();raise

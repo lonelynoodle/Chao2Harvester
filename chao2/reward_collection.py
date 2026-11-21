@@ -23,6 +23,8 @@ ECHO_HUB_REGIONS = {
 CLAIM = r'^(?:[一－—-]?键)?领[取奖](?:全部)?$|^领取奖励$'
 COMMENT = r'^.{0,2}评论$'  # OCR may join the adjacent comment icon as 日/口.
 CONTRACT_CLAIM_ROI = (0,165,215,455)
+CONTRACT_TAB_ROI = (555,635,180,80)
+TREASURE_HUD_ROI = (1180,270,100,86)
 STORY_CHESTS = {'lost':(175,530,125,115), 'notes':(175,530,125,115), 'torrent':(65,570,135,115)}
 
 
@@ -53,12 +55,18 @@ def is_map_story(s):
         return False
     title=s.find(r'^.{2,16}$',(370,210,550,70))
     lines=[w for w in s.words if 365<=w.box[0]<=400 and 285<=w.center[1]<=590 and len(w.text)>=12]
-    return bool(title and len(lines)>=3)
+    # Rift lore (e.g. 031) can contain just one line. The numbered title,
+    # fixed comment control and body layout identify the card, not its length.
+    return bool(title and lines)
 
 
 def is_contract(s):
-    return bool(s.find('^宝藏$',(90,0,170,65)) and s.find('^蜕变契约$',(555,635,180,80)) and
+    return bool(contract_entry(s) and
                 s.find('^契约等级$',(235,70,145,65)) and s.find('^任务$',(1180,340,100,150)))
+
+def contract_entry(s):
+    if s.find('^宝藏$',(90,0,170,65)):
+        return s.find('^蜕变契约$',CONTRACT_TAB_ROI)
 
 
 def contract_page(s):
@@ -208,14 +216,32 @@ class RewardCollection:
         raise TaskBlocked('领取后的结果未确认，未重复点击同一奖励')
 
     def contract_menu(self):
+        from .workflows import is_world
+
+        def resource_details(q):
+            return q.has('^主要获得途径$','^已拥有')
+
         s=self.observe()
+        if not contract_entry(s):s=self.home(s)
+        for attempt in range(4):
+            if contract_entry(s):break
+            if attempt:self.navigation_retry('已返回世界，重试宝藏入口',attempt,s)
+            entry=s.find('^宝藏$',TREASURE_HUD_ROI)
+            self.click_world(s,entry.center if entry else (1231,305),'打开宝藏中的蜕变契约')
+            s=self.wait_for_screen(lambda q:contract_entry(q) or resource_details(q) or is_world(q),
+                                   '宝藏入口响应',timeout=3)
+            if resource_details(s):
+                self.note('宝藏入口当前显示资源说明，关闭弹窗后重试')
+                s=self.home(s)
+        if not contract_entry(s):raise TaskBlocked('宝藏入口补点3次后仍未打开')
         if is_contract(s):return s
-        s=self.home(s);self.click_world(s,(1231,305),'打开宝藏中的蜕变契约')
-        s=self.await_page('^宝藏$','^蜕变契约$')
-        self.b.click_text(s,'^蜕变契约$',roi=(555,635,180,80))
+        def select_contract(q):
+            if contract_entry(q) and not is_contract(q) and not resource_details(q):
+                self.b.click_text(q,'^蜕变契约$',roi=CONTRACT_TAB_ROI)
+        select_contract(s)
         # The treasure frame and footer appear before the contract content.
         # Wait for its own controls; a loading frame is not a failed entry.
-        return self.wait_for_screen(is_contract,'蜕变契约加载',timeout=4)
+        return self.wait_for_screen(is_contract,'蜕变契约加载',timeout=4,retry_navigation=select_contract)
 
     def collect_contract(self):
         result={'status':'running','task_batches':0,'reward_batches':0,'task_tabs':{}}

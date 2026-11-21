@@ -231,6 +231,7 @@ class TriadActivities:
         self.b.guard(s)
         s,quota=self.await_triad_quota(s)
         if quota<1:raise TaskBlocked('三阵入局免费匹配次数已用完，未点击匹配')
+        s=self.prepare_battle_wall('triad',s)
         if triad_is_open(s) is False:raise TaskBlocked('三阵入局当前不在客户端标明的开放时段，未点击匹配')
         button=s.find(MATCH,(150,430,1100,260))
         if button is None:raise TaskBlocked('三阵入局没有可确认的免费匹配按钮')
@@ -251,11 +252,11 @@ class TriadActivities:
         pending=self.wait_for_screen(lambda q:is_triad_matching(q) or is_triad_battle(q,known_match=True) or
             bool(q.has('即将进入战斗','^2v2$','^3v3$','^5v5$')),
             '三阵入局开始匹配',timeout=4,retry_navigation=match)
-        until=time.monotonic()+max(300,int(self.b.settings.get('battle_timeout_seconds',240))*3)
         began=False;saw_battle=False;clicks=0
-        feedback=time.monotonic();unknown_since=None;network_retries=0
-        while time.monotonic()<until:
-            s=pending if pending is not None else self.observe();pending=None;self.b.guard(s)
+        feedback=time.monotonic();unknown_since=None;network_retries=0;returned={'started':time.monotonic()}
+        for s in self.battle_frames(max(300,int(self.b.settings.get('battle_timeout_seconds',240))*3),
+                '三阵入局',first=pending,observe=self.observe,clock=time.monotonic):
+            self.b.guard(s)
             if self.retry_battle_network(s,network_retries):
                 network_retries+=1;continue
             outcome=triad_result(s)
@@ -267,8 +268,7 @@ class TriadActivities:
             if matching or fighting:
                 began=True;unknown_since=None
             if fighting:saw_battle=True
-            if is_triad_lobby(s):
-                raise TaskBlocked('匹配后直接返回三阵入局页面，未见最终战斗结算，未计次')
+            if self.battle_return_page(s,returned,ready=saw_battle or clicks>0):return s,'unobserved',clicks
             advance=s.find(r'^下一(?:阵|局|场|回合)$',(700,440,580,250))
             if advance and began:
                 self.b.click_at(s,advance.center,['^'+re.escape(advance.text)+'$'],'进入三阵入局下一回合')
@@ -294,7 +294,6 @@ class TriadActivities:
                 self.note('三阵入局正在匹配或战斗，等待最终结果…')
                 feedback=time.monotonic()
             self.b.sleep(1)
-        raise SafetyStop('三阵入局匹配或战斗未在时限内结算，保留现场')
 
     def triad(self):
         s=self.triad_lobby();matches=0;settlements=0
@@ -326,11 +325,12 @@ class TriadActivities:
             matches+=1;settlements+=clicks
             self.report['triad_remaining']=after
             verified=after==before-1
-            self.resource_spent('triad','免费匹配次数',1 if verified else None,after)
+            spent=self.returned_quota_spent('triad',before,after,outcome)
+            self.resource_spent('triad','免费匹配次数',spent,after)
             self.record_daily_fight('triad',None,outcome,settlements=clicks,remaining=after,
                                     quota_verified=verified)
             self.note(f'三阵入局已完成{matches}场，点击结算按钮{clicks}次；剩余免费次数'+(str(after) if after is not None else '未读清'))
             if after is None:raise TaskBlocked('三阵入局已结算，但剩余免费次数未读清，未继续匹配')
-            if not verified:raise TaskBlocked(f'三阵入局已结算，但免费次数从{before}变为{after}，不是消耗1次')
+            if spent is None:raise TaskBlocked(f'三阵入局已结算，但免费次数从{before}变为{after}，不是消耗1次')
         self.home()
         return f'三阵入局已完成{matches}场，点击结算{settlements}次；当日免费次数'+('已用完' if self.report.get('triad_remaining')==0 else '已检查')

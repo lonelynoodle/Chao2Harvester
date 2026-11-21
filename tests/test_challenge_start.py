@@ -19,6 +19,8 @@ def result(balance=5):
 def setup_launch(tmp_path):
     d=daily(tmp_path);d.b.sleep=lambda _:None
     detail=captured('v0938-tower-401-detail',True);state=[detail];clicks=[]
+    d.b.tasker=object()
+    d.b.read_text_region=lambda s,*a,**kw:s.region_text((1140,0,140,65))
     d.observe=lambda:state[0]
     d.b.click_text=lambda s,p,**kw:clicks.append((s,p))
     d.resource_balance('tower','浮空羽毛',6)
@@ -168,7 +170,7 @@ def test_confirmed_start_integrates_with_tower_chain_without_reselecting_teams(t
     game.d.b.click_text=click
     game.d.tower()
     assert len(game.challenges)==game.d.task_counts['tower']==3 and game.balance==0
-    assert game.secrets==['normal'] and game.detail_entries==1
+    assert game.secrets==['normal','dragon','puppet'] and game.detail_entries==1
     assert game.d.report['challenge_starts'][0]['clicks']==2
 
 

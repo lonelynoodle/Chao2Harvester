@@ -5,13 +5,16 @@ import time
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from .configuration import COCOON_CARDS,COCOON_DAILIES,STAMINA_TASKS,team_order,selected_rows,limit_reached,run_team_plan
-from .policy import TaskBlocked,SafetyStop,UserStopped,FightLost,EncounterInterrupted,ChallengeLocked,parse_ratio,friend_allowed,can_claim_stamina
+from .policy import TaskBlocked,SafetyStop,UserStopped,FightLost,EncounterInterrupted,ChallengeLocked,PageChanged,parse_ratio,friend_allowed,can_claim_stamina
 from .world_events import is_map_choice,map_choice_controls,map_choice_main_target,map_choice_hunt_target
 from .event_hub import event_hub_anchors,activity_entry,activity_availability
-from .team_copy import source_lineup,copied_lineup,is_saved_team_list,saved_team_anchors,saved_team_copy_target
+from .team_copy import source_lineup,copied_lineup,is_saved_team_list,saved_team_anchors,saved_team_copy_target,is_tribe_formation
+from .team_copy import tribe_troop_deployed
 from .tribe_totems import totem_identity,totem_nodes,TOTEM_REWARD
 from .cocoon_settings import cocoon_reserve
 from .team_switch import suppression_team_switch_dialog
+from .control_retry import retry_point
+from .screen_loading import loading_spinner
 
 class BudgetReached(TaskBlocked): pass
 class ResourceReserveReached(BudgetReached): pass
@@ -26,8 +29,14 @@ FRIEND_WEEK_CAP=1000
 STAMINA_CLAIM=r'^(?:领取|免费领取|领取奖励)$'
 HUNT_BATCH_SIZE=3
 HUNT_STAMINA_COST=10
+HUNT_FORMATION_BUTTON_ROI=(765,590,180,85)
 SECRET_NODE_PATTERN=r'^塔中秘庭[1-9]\d{0,2}$'
 FORMATION_HEADER_ROI=(45,0,230,65)
+
+def formation_layout(s):
+    return bool(s.find('^排阵$',FORMATION_HEADER_ROI) and
+                s.find(r'^队伍[1-9]$|浮空巨塔|永生之茧|进击巨物|狩猎|异象|秘庭|部落冒险|黑暗森林|[凿幽]星裂痕',
+                       (890,60,250,70)))
 
 def encounter_identity(screen):
     # Names and power live below the top resource bar; the timer is to their right.
@@ -178,6 +187,19 @@ def tribe_nodes(screen):
 MAIN_BADGE_ROI=(25,115,100,90)
 
 
+def recover_tower_detail(b,s):
+    if s.find(r'^塔中秘庭\d+$',(150,80,550,80)):
+        from .dungeon_labels import recover_secret_heading
+        return recover_secret_heading(b,s)
+    if (enemy_formation(s) or b.tasker is None or
+            not s.find(r'浮空巨塔\s*\d+$|塔中秘庭\s*\d+$',(150,80,550,80)) or
+            not s.has('^排阵$','^挑战$|^前往挑战$')):return s
+    from .backend import Screen
+    fresh=Screen(s.image,list(s.words),s.when)
+    if b.confirm_label(fresh,'^敌方阵容$',(1010,85,180,80),scale=3,threshold=.8):return fresh
+    return s
+
+
 def main_identity(screen):
     # Only a complete number in the stage badge is an identity. Searching the
     # whole title accepted truncated OCR such as "7I2" as stage "7I".
@@ -203,8 +225,19 @@ def main_detail_layout(s):
 
 
 def recover_main_detail(b,s):
-    if not main_detail_layout(s) or b.tasker is None:return s
+    if b.tasker is None:return s
     from .backend import Screen,Word
+    from .dungeon_labels import OVERLAY,REPLAY_LABEL,REPLAY_ROI,recover_heading
+    if not main_detail_layout(s):
+        if (not s.find('^排阵$',(750,585,220,95)) or
+                not s.find('^(?:前往)?挑战$',(965,585,275,95)) or
+                not s.find(REPLAY_LABEL,REPLAY_ROI) or
+                not s.find('首通奖励|探索之锋') or s.find(OVERLAY)):return s
+        # The same full-frame pass can miss both the badge and the red enemy
+        # heading. Confirm the actual heading before recovering its number.
+        heading=recover_heading(b,s,(1080,115,200,80))
+        if not main_detail_layout(heading):return s
+        s=heading
     reads=[b.read_text_crop(s,(35,135,80,45)).strip(),
            b.read_text_region(s,(30,132,90,50),scale=3,threshold=.8).strip()]
     identity=reads[0] if reads[0]==reads[1] and re.fullmatch(r'\d{1,4}',reads[0]) else None
@@ -524,7 +557,9 @@ class ConfiguredActivities:
                 from .reward_collection import is_map_story
                 if is_map_story(s):s=self.close_map_story(s)
             if self.active_task=='main' and main_unlock_level(s) is not None:return s
-            if enemy_formation(s) and s.find('^排阵$'):return self.ensure_detail(s)
+            if (enemy_formation(s) and s.find('^排阵$') and
+                    (self.active_task!='hunt' or not loading_spinner(s))):
+                return self.ensure_detail(s)
             if s.find('等级不足|需要.*级|尚未解锁'):raise TaskBlocked('目标尚未解锁')
             # A card click can leave the client on the map without opening its
             # encounter. Retry only that same pending slot on a fresh hunt list;
@@ -588,11 +623,7 @@ class ConfiguredActivities:
 
     def formation_page(self,retry_detail=None):
         def ready(s):
-            if s.find('^排阵$',roi=FORMATION_HEADER_ROI) and s.find(r'^队伍[1-9]$|浮空巨塔|永生之茧|进击巨物|狩猎|异象|秘庭|部落冒险|黑暗森林|[凿幽]星裂痕',roi=(890,60,250,70)):
-                return True
-            if self.active_task=='tribe' and s.find('^部队$',roi=FORMATION_HEADER_ROI) and s.find(r'^(?:空闲\s*[12]?|部队[12])$',roi=(890,60,250,70)):
-                return True
-            return False
+            return formation_layout(s) or (self.active_task=='tribe' and is_tribe_formation(s))
         if retry_detail is not None:
             def retry(q):
                 # Replay only while the same challenge detail is still open.
@@ -619,18 +650,71 @@ class ConfiguredActivities:
             self.b.sleep(.5)
         raise TaskBlocked('排阵配置尚未加载，保留现场')
 
+    def open_hunt_formation(self,detail):
+        challenge='^挑战$|^前往挑战$'
+        identity=encounter_identity(detail)
+        until=time.monotonic()+30
+        clicks=0
+        same_detail_reads=0
+        while time.monotonic()<until:
+            s=self.observe()
+            self.b.guard(s)
+            self.resolve_path_event(s)
+            if loading_spinner(s) or s.find('^取消$|^确定$|^获得奖励$|^请选择$|^复制此配置$'):
+                same_detail_reads=0
+                self.b.sleep(.25)
+                continue
+            if formation_layout(s):return s
+
+            button=s.find('^排阵$',HUNT_FORMATION_BUTTON_ROI)
+            heading=enemy_formation(s)
+            if ((clicks and not identity) or encounter_identity(s)!=identity or not button or not heading or
+                    not s.find(challenge,(960,590,280,85))):
+                same_detail_reads=0
+                self.b.sleep(.25)
+                continue
+            same_detail_reads+=1
+            # One lingering detail frame can precede a loading spinner.
+            if clicks and same_detail_reads<2:continue
+            if clicks==4:raise TaskBlocked('狩猎排阵补点3次后仍在原猎物详情，未开始挑战')
+            if clicks:self.navigation_retry('仍在原猎物详情，补点排阵',clicks,s)
+            self.b.click_at(s,retry_point(button,clicks),
+                            ['^排阵$','^'+re.escape(heading.text)+'$',challenge],
+                            '打开狩猎排阵',settle_delay=0)
+            clicks+=1
+            same_detail_reads=0
+        raise TaskBlocked('狩猎排阵未确认，已停止本项')
+
+    def open_detail_formation(self,detail):
+        if self.active_task=='hunt':return self.open_hunt_formation(detail)
+        self.b.click_text(detail,'^排阵$')
+        return self.formation_page(retry_detail=detail)
+
     def select_team(self,detail,team,return_page=None):
         if team is None:return detail
-        self.b.click_text(detail,'^排阵$');s=self.formation_page(retry_detail=detail)
+        s=self.open_detail_formation(detail)
         s=self.apply_saved_team(s,team)
         header='^部队$' if self.active_task=='tribe' else '^排阵$'
         self.b.click_at(s,(45,28),[header],'返回关卡')
         return (return_page or self.await_detail)()
 
-    def apply_saved_team(self,s,team):
+    def close_saved_team_list(self,s):
+        from .backend import Word
+        for attempt in range(4):
+            if not is_saved_team_list(s):return s
+            self.b.guard(s)
+            close=Word('配置关闭',[946,40,29,29],1.)
+            self.b.click_at(s,retry_point(close,attempt),saved_team_anchors(s),'收起配置')
+            s=self.observe()
+            if not is_saved_team_list(s):return s
+            if is_saved_team_list(s) and attempt<3:
+                self.navigation_retry('配置窗口仍在，重新确认后小偏移补点关闭',attempt+1,s)
+        from .policy import IsolatedTaskError
+        raise IsolatedTaskError('配置窗口关闭补点3次仍未生效，本项回退后继续下一任务')
+
+    def apply_saved_team(self,s,team,*,_copy_retry=0):
         """Select a saved world team or copy it to a verified independent slot."""
-        tribe_slot=self.active_task=='tribe' and bool(s.find('^部队$',roi=FORMATION_HEADER_ROI) and
-            s.find(r'^(?:空闲\s*[12]?|部队[12])$',roi=(890,60,250,70)))
+        tribe_slot=self.active_task=='tribe' and is_tribe_formation(s)
         nest_slot=self.active_task=='nest' and bool(s.find('^[谜迷]之巢穴$',roi=FORMATION_HEADER_ROI) and
             s.find('^暴走旷野$',roi=(890,60,250,70)))
         header='^部队$' if tribe_slot else '^[谜迷]之巢穴$' if nest_slot else '^排阵$'
@@ -670,10 +754,11 @@ class ConfiguredActivities:
             source=source_lineup(s.image,row.center[1])
             if source is None:raise TaskBlocked(target+'源配置头像未读清，未复制阵容')
             self.b.save_screen(s,self.report['folder']/'team-copy-source.png')
-            self.b.click_at(s,button.center,['^'+re.escape(target)+'$','^复制此配置$'],
+            self.b.click_at(s,retry_point(button,_copy_retry),['^'+re.escape(target)+'$','^复制此配置$'],
                             '复制保存的'+target+'到独立配置');s=self.observe()
-            if is_saved_team_list(s):
-                self.b.click_at(s,(960,54),saved_team_anchors(s),'收起配置');s=self.observe()
+            copy_list_stayed=is_saved_team_list(s)
+            if copy_list_stayed:
+                s=self.close_saved_team_list(s)
             check={'task':self.active_task,'team':team,'expected_power':expected,'status':'pending'}
             self.report.setdefault('team_copy_checks',[]).append(check)
             evidence={'verified':False,'reason':'复制阵容后的排阵页未确认'}
@@ -690,13 +775,24 @@ class ConfiguredActivities:
                 evidence=copied_lineup(source,s.image)
                 check.update(actual_power=actual,power_matches=actual==expected if expected is not None else None,
                              reads=attempt+1,**evidence)
+                if tribe_slot and copy_list_stayed and tribe_troop_deployed(s):
+                    check['status']='kept_deployed'
+                    self.note('当前部队已派出，已收起配置，沿用当前部队挑战')
+                    self.checkpoint()
+                    return s
                 if evidence['verified']:break
                 if attempt<2:self.b.sleep(.6);s=self.observe()
             check['status']='verified' if evidence['verified'] else 'unconfirmed'
             if not evidence['verified']:
-                raise TaskBlocked(f'{target}复制后怪兽或神灵配置未确认；已重读3次，保留现场')
+                path=self.report['folder']/f'team-copy-unconfirmed-{len(self.report["team_copy_checks"])}.png'
+                self.b.save_screen(s,path);check['screenshot']=str(path)
+                if _copy_retry<2:
+                    check['status']='retrying'
+                    self.navigation_retry(target+'复制后怪兽未确认，重新核对同一配置后补点',_copy_retry+1,s)
+                    return self.apply_saved_team(s,team,_copy_retry=_copy_retry+1)
+                raise TaskBlocked(f'{target}复制后五只怪兽配置未确认；已重读3次，保留现场')
             if expected is None or actual!=expected:
-                self.note(f'{target}五只怪兽与神灵已核对，战力读数仅作辅助，继续挑战')
+                self.note(f'{target}五只怪兽已核对，战力读数仅作辅助，继续挑战')
         self.note('已选择'+target)
         return s
 
@@ -763,14 +859,17 @@ class ConfiguredActivities:
                 if instant_checkbox_present(fresh):break
         raise TaskBlocked('瞬破未确认关闭')
 
-    def play_encounter(self,task,opener,resource,verify=None,attempt_guard=None,on_started=None,prepare_team=None):
+    def play_encounter(self,task,opener,resource,verify=None,attempt_guard=None,on_started=None,prepare_team=None,teams_override=None):
         """Reopen the same target before each fallback team; move on after a win."""
         def attempt_once(team):
             self.check_budget(task)
             if attempt_guard:attempt_guard()
             detail=self.ensure_detail(opener())
             main_target=main_identity(detail) if task=='main' else None
+            copy_start=len(self.report.get('team_copy_checks',[]))
             detail=(prepare_team or self.select_team)(detail,team)
+            kept_deployed=task=='tribe' and any(check.get('status')=='kept_deployed'
+                for check in self.report.get('team_copy_checks',[])[copy_start:])
             if task=='main':detail=self.stable_main_detail(detail,main_target,'after-team')
             if verify:verify(detail)
             if task=='tribe':self.prepare_tribe_attempt(detail)
@@ -779,7 +878,8 @@ class ConfiguredActivities:
             self.active_task=task
             if task=='main':
                 self.b.save_screen(detail,self.report['folder']/f'main-attempt-{self.task_counts.get(task,0)+1}-detail.png')
-            self.start_challenge(task,detail,resource,verify)
+            if kept_deployed:self.start_challenge(task,detail,resource,verify,keep_current_wall=True)
+            else:self.start_challenge(task,detail,resource,verify)
             if on_started:on_started()
             try:
                 result=self.battle(resource)
@@ -788,21 +888,20 @@ class ConfiguredActivities:
             if task=='main' and outcome=='failed':
                 self.b.save_screen(result,self.report['folder']/f'main-attempt-{self.task_counts.get(task,0)}-failed.png')
             floor=detail.find(r'(?:浮空巨塔|塔中秘庭)\s*\d+$',roi=(160,80,520,65)) if task=='tower' else None
-            self.report.setdefault('team_attempts',[]).append({'task':task,'team':team,'outcome':outcome,
+            self.report.setdefault('team_attempts',[]).append({'task':task,'team':None if kept_deployed else team,'outcome':outcome,
                 'target':main_identity(detail) if task=='main' else tribe_identity(detail) if task=='tribe' else floor.text if floor else encounter_identity(detail)})
-            target=self.report['team_attempts'][-1]['target']
+            attempt=self.report['team_attempts'][-1]
+            if kept_deployed:attempt['used_deployed_troop']=True
+            target=attempt['target']
+            lineup='（沿用出征部队）' if kept_deployed else f'（队伍{team}）' if team else ''
             self.note(('结算完成' if outcome=='score' else '挑战胜利' if outcome=='victory' else '挑战未通过')+
-                      ('：'+target if target else '')+('（队伍'+str(team)+'）' if team else ''))
+                      ('：'+target if target else '')+lineup)
             self.checkpoint()
             self.exit_result(result)
             return outcome
         def attempt(team):
-            for interruption in range(3):
-                try:return attempt_once(team)
-                except EncounterInterrupted:
-                    self.note('寻路事件处理完成，重新确认原关卡和费用后继续')
-            raise TaskBlocked('原目标连续被寻路事件打断，保留现场，未重复计为通关')
-        results=run_team_plan(team_order(self.options[task]),'clear',attempt)
+            return attempt_once(team)
+        results=run_team_plan(team_order(self.options[task]) if teams_override is None else teams_override,'clear',attempt)
         return any(outcome=='victory' or (task=='tribe' and outcome=='score') for _,outcome in results)
 
     def verify_stamina_cost(self,s,cost):
@@ -823,7 +922,7 @@ class ConfiguredActivities:
 
     def verify_dungeon_resource(self,task,s,roi=(1140,0,140,65)):
         key,label=DUNGEON_RESOURCES[task]
-        ratio=self.b.read_resource_ratio(s,roi)
+        ratio=self.dungeon_ratio(task,s,roi)
         if not ratio:raise TaskBlocked(label+'余额未识别')
         reserve=cocoon_reserve(self.options[task]) if task=='cocoon' else self.options[task][key]
         self.resource_balance(task,label,ratio[0])
@@ -834,13 +933,19 @@ class ConfiguredActivities:
             raise ResourceReserveReached(f'{label}剩余{ratio[0]}，'+(f'按设置保留{reserve}个' if reserve else '已用完'))
 
     def clear_tribe_reward(self,s):
-        for _ in range(3):
-            if not is_tribe_reward_overlay(s):return s
-            self.b.guard(s)
-            self.b.click_at(s,(640,560),['^部落$','^获得奖励$'],'关闭部落冒险延迟奖励')
-            s=self.wait_for_screen(is_tribe_map,'部落奖励关闭后地图恢复',timeout=8)
-        if is_tribe_reward_overlay(s):raise TaskBlocked('部落额外奖励尚未关闭，保留现场')
-        return s
+        if not is_tribe_reward_overlay(s):return s
+        clicks=0
+        def close(q):
+            nonlocal clicks
+            if not is_tribe_reward_overlay(q):return
+            # Use the free dismissal strip below the reward panel. The old
+            # y=560 click could be swallowed, and observation alone never retried it.
+            dx,dy=((0,0),(-3,2),(3,-2),(0,-3))[min(clicks,3)]
+            clicks+=1
+            try:self.b.click_at(q,(640+dx,660+dy),['^部落$','^获得奖励$'],'关闭部落冒险延迟奖励')
+            except PageChanged:pass
+        close(s)
+        return self.wait_for_screen(is_tribe_map,'部落奖励关闭后地图恢复',timeout=3,retry_navigation=close)
 
     def stable_tribe_node(self,s,point):
         for attempt in range(5):
@@ -1013,7 +1118,13 @@ class ConfiguredActivities:
         self.tribe_orders_before=balance
 
     def tribe_settlement(self,s):
-        if not s.has('^退出$','获得奖励','重复挑战'):return None
+        from .tribe_totems import tribe_result
+        if not tribe_result(s):return None
+        if not s.find('重复挑战'):
+            # The auction reward layout has no repeat checkbox or order HUD.
+            # Acknowledge the result; the task reads the real balance on return.
+            self.note('已确认部落拍卖品结算页，无重复挑战控件；退出后重新核对战令')
+            return s
         ratio=parse_ratio(s.region_text((1140,0,140,65)))
         if ratio is None:raise TaskBlocked('部落结算战令余额未读清')
         spent=getattr(self,'tribe_orders_before',ratio[0]+1)-ratio[0]
@@ -1039,6 +1150,7 @@ class ConfiguredActivities:
 
     def tribe(self):
         self.active_task='tribe'
+        self.collect_tribe_extras()
         self.collect_tribe_chests()
         settlements=0;previous=None;reason=''
         while True:
@@ -1134,8 +1246,6 @@ class ConfiguredActivities:
         ratio=parse_ratio(s.region_text((490,0,170,65)))
         if not ratio:raise TaskBlocked('狩猎体力未识别')
         if self.limit-self.battles<HUNT_BATCH_SIZE:return '本轮剩余战斗次数不足以打完3只猎物'
-        remaining=int(self.b.settings.get('max_run_minutes',90))*60-(time.monotonic()-self.start_time)
-        if remaining<600:return '本轮剩余运行时间不足10分钟'
         if ratio[0]<HUNT_BATCH_SIZE*HUNT_STAMINA_COST:
             return f'体力剩余{ratio[0]}，新一批3只猎物需要30体力，体力不足'
         return None
@@ -1145,7 +1255,7 @@ class ConfiguredActivities:
         options=self.options['hunt'];reasons=[]
         self.hunt_refill_reason=''
         if options['auto_three_shots']:
-            if self.claim_free_stamina() is not None:
+            if self.try_stamina_refill('free') is not None:
                 self.stamina_progress('spending','狩猎：免费体力已到账，立即返回狩猎继续挑战')
                 self.report['stamina_refill']['status']='done'
                 return True
@@ -1154,14 +1264,13 @@ class ConfiguredActivities:
         if options['auto_potions']:
             if not getattr(self,'_stamina_potions_unavailable',False):
                 self.stamina_progress('opening_inventory',f'狩猎需要{required}体力，按设置检查库存移动力药水')
-                gain=self.use_stamina_potion()
+                gain=self.try_stamina_refill('potion')
                 if gain is not None:
                     self.report['stamina_potion_count']=self.report.get('stamina_potion_count',0)+1
                     self.stamina_progress('spending','狩猎：库存体力已到账，立即返回狩猎继续挑战')
                     self.report['stamina_refill']['status']='done'
                     return True
-                self._stamina_potions_unavailable=True
-            reasons.append('库存移动力药水不可用')
+            reasons.append(getattr(self,'stamina_potion_reason','库存移动力药水不可用'))
         else:reasons.append('未开启库存移动力药水')
         self.hunt_refill_reason='；'.join(reasons)
         self.report.setdefault('stamina_refill',{}).update(status='done',message=self.hunt_refill_reason,
@@ -1201,8 +1310,6 @@ class ConfiguredActivities:
                 # Check non-resource budgets before claiming a free serving.
                 if self.limit-self.battles<HUNT_BATCH_SIZE:
                     reason='本轮剩余战斗次数不足以打完3只猎物，未开启新一批狩猎';break
-                if int(self.b.settings.get('max_run_minutes',90))*60-(time.monotonic()-self.start_time)<600:
-                    reason='本轮剩余运行时间不足10分钟，未开启新一批狩猎';break
             if ratio[0]<required:
                 self.note(f'狩猎：体力{ratio[0]}，'+(f'剩余{len(rows)}只' if rows else '新一批3只')+f'需要{required}，先按设置补体力')
                 if self.hunt_refill(required):pending=self.hunt_menu();continue
@@ -1217,7 +1324,10 @@ class ConfiguredActivities:
                 reason=f'体力剩余{ratio[0]}，体力不足；{self.hunt_refill_reason}'
                 if not rows:
                     reason+='；未开启新一批狩猎';break
-                if ratio[0]<HUNT_STAMINA_COST:raise TaskBlocked(reason)
+                if ratio[0]<HUNT_STAMINA_COST:
+                    self.report['hunt_batch']['status']='stamina_unavailable'
+                    reason+=f'；剩余{len(rows)}只猎物，继续后续任务'
+                    break
                 self.note('无法补充整批体力，先挑战当前体力可完成的剩余猎物')
             if not rows:
                 s=self.search_hunters(s)
@@ -1265,80 +1375,117 @@ class ConfiguredActivities:
         self.b.save_screen(s,self.report['folder']/'hunt-list-not-refreshed.png')
         raise TaskBlocked('猎物已结算，但列表重读3次后仍未确认减少；未重复挑战或继续搜索')
 
+    def main_search_limit_reached(self):
+        options=self.options['main']
+        return bool(options.get('search_limit_enabled',False) and
+                    self.report.get('main_searches',0)>=options.get('max_searches',50))
+
+    def count_main_search(self,source):
+        self.b.check_stop()
+        if self.main_search_limit_reached():
+            raise BudgetReached(f'主线搜索达到设置的{self.options["main"]["max_searches"]}次上限，继续下一个任务')
+        count=self.report.get('main_searches',0)+1
+        self.report['main_searches']=count
+        self.report.setdefault('main_search_history',[]).append({'number':count,'source':source})
+        self.checkpoint()
+
     def main(self):
         self.stamina_retry['main']=False
-        wins=0;examined=self.report.get('main_examined',0);failed=self.report.setdefault('main_failed',[]);visited=set(failed)
-        options=self.options['main'];pending=None
-        visited.update(self.report.get('main_retry_unlocated',[]))
+        wins=0;options=self.options['main'];teams=team_order(options)
+        failed=self.report.setdefault('main_failed',[])
+        seen=self.report.setdefault('main_seen',[]);idle=set()
+        progress=self.report.setdefault('main_stage_progress',{})
+        # Settlement records also survive a failed exit or page recovery.
+        for row in self.task_attempts('main'):
+            identity=row.get('target')
+            if not isinstance(identity,str) or row.get('outcome') not in ('victory','failed'):continue
+            entry=progress.setdefault(identity,{'teams':[],'cleared':False})
+            if row.get('team') not in entry['teams']:entry['teams'].append(row.get('team'))
+            if row['outcome']=='victory':entry['cleared']=True
         if not self.overview_prepared_for('main'):
-            s=self.home()
-            balance=self.world_resources(s)['stamina']
+            s=self.home();balance=self.world_resources(s)['stamina']
             self.resource_balance('main','地图体力',balance)
             if balance is not None and balance<5:
                 self.stamina_retry['main']=True;return f'体力剩余{balance}，不足主线单次5体力'
-        # Client overview takes us to a currently available stage, including stages off screen.
-        pending=self.main_overview_detail()
         pans=iter(((940,360,350,360),(360,360,940,360),(640,490,640,210),(640,210,640,490)))
+        reason='概览已轮回，当前关卡的所选队伍均已尝试或尚未解锁'
+        resume_target=None;handoffs=0
         while True:
             self.check_budget('main')
-            if limit_reached(options['max_nodes'],examined):break
-            if pending is None:
-                s=self.home()
-                if (self.world_resources(s)['stamina'] or 0)<5:
-                    self.stamina_retry['main']=True;break
-                pending=self.find_main_candidate(visited)
+            if self.main_search_limit_reached():
+                reason=f'主线搜索达到设置的{options["max_searches"]}次上限';break
+            try:
+                if resume_target is not None:
+                    pending=self.last_main_detail(resume_target)
+                    resume_target=None
+                else:
+                    pending=self.main_overview_detail()
                 if pending is None:
-                    swipe=next(pans,None)
-                    if swipe is None:break
-                    s=self.home();self.b.guard(s)
-                    self.b.wait(self.b.controller.post_swipe(*swipe,850));self.b.sleep(1.5)
-                    pending=self.find_main_candidate(visited)
-                    if pending is None:continue
+                    excluded=set(failed)|{n for n,e in progress.items() if e['cleared']}
+                    pending=self.find_main_candidate(excluded)
+            except MainRetryUnavailable as error:
+                self.note(str(error));resume_target=None;self.home();continue
+            except EncounterInterrupted as error:
+                handoffs+=1
+                if handoffs>3:raise TaskBlocked('主线目标连续被寻路事件打断，未发起额外挑战') from error
+                self.note('主线寻路事件已处理，继续核对目标');self.home();continue
+            if pending is None:
+                swipe=next(pans,None)
+                if swipe is None:
+                    reason='当前搜索范围内没有剩余可挑战节点';break
+                s=self.home();self.b.guard(s)
+                self.b.wait(self.b.controller.post_swipe(*swipe,850));self.b.sleep(1.5)
+                continue
             pending=self.stable_main_detail(pending,phase='target')
             identity=main_identity(pending)
             if identity is None:raise TaskBlocked('主线关卡编号未识别')
-            if identity in visited:pending=None;continue
-            # Overview opens a remote stage without centering the world camera.
-            # Challenge the verified detail first: walking then brings us to the
-            # actual node. Fallbacks still verify exactly the original identity.
-            visited.add(identity);examined+=1;self.report['main_examined']=examined
-            if self.record_locked_main(pending):
-                self.back_detail(pending);pending=None;continue
-            first=[pending];pending=None
+            if identity not in seen:seen.append(identity)
+            self.report['main_examined']=len(seen)
+            entry=progress.setdefault(identity,{'teams':[],'cleared':False})
+            remaining=[team for team in teams if team not in entry['teams']]
+            locked=self.record_locked_main(pending)
+            if locked or entry['cleared'] or not remaining:
+                self.back_detail(pending)
+                if identity in idle:break
+                idle.add(identity);continue
+            # The client has already selected this stage. Try one unused team
+            # here; another overview visit can supply a different stage.
+            idle.clear();team=remaining[0];first=[pending]
             def opener():
                 if first:return first.pop()
-                # Retry the verified map node, never ask overview for a new one.
-                q=self.last_main_detail(identity)
-                if main_identity(q)!=identity:raise TaskBlocked('换队前关卡改变')
-                return q
+                raise MainRetryUnavailable('主线'+identity+'寻路被事件打断，保留未尝试队伍，继续当前推荐关卡')
             def verify(q):
                 if main_identity(q)!=identity:raise TaskBlocked('主线换队后关号与原目标不符，未挑战')
                 if not q.find('^首通奖励$') or q.find('已通关|首通奖励已领取'):
                     raise TaskBlocked('该主线没有确认首通奖励')
                 self.verify_stamina_cost(q,5)
-            try:won=self.play_encounter('main',opener,'主线体力5',verify)
-            except MainRetryUnavailable as e:
-                self.report.setdefault('main_retry_unlocated',[]).append(identity)
-                self.note(str(e)+'；跳过本关剩余阵容，寻找其他关卡')
-                self.home();continue
+            self._main_interrupted_target=None
+            try:
+                won=self.play_encounter('main',opener,'主线体力5',verify,teams_override=[team])
+            except MainRetryUnavailable as error:
+                self.note(str(error));self.home();continue
+            except EncounterInterrupted as error:
+                if self._main_interrupted_target!=identity:raise
+                handoffs+=1
+                if handoffs>3:raise TaskBlocked('主线'+identity+'连续被寻路事件打断，保留未尝试队伍') from error
+                self.note('主线'+identity+'的寻路事件已处理，重新定位同一关卡')
+                resume_target=identity;continue
+            handoffs=0
+            if team not in entry['teams']:entry['teams'].append(team)
             if won:
-                wins+=1
+                wins+=1;entry['cleared']=True
                 self.main_positions.pop(identity,None);self.main_views.pop(identity,None)
-                # Advance through the client's next verified suggestion.
-                s=self.home()
-                if (self.world_resources(s)['stamina'] or 0)<5:
-                    self.stamina_retry['main']=True;break
-                if limit_reached(options['max_nodes'],examined):break
-                self.check_budget('main')
-                pending=self.main_overview_detail()
-            else:
-                failed.append(identity);self.note('主线'+identity+'全部所选阵容失败，寻找其他关卡')
+            elif all(t in entry['teams'] for t in teams):
+                if identity not in failed:failed.append(identity)
+                self.note('主线'+identity+'全部所选阵容失败，寻找其他关卡')
+            else:self.note('主线'+identity+'保留其余阵容，下次遇到本关再尝试')
+            self.checkpoint()
+            s=self.home()
+            if (self.world_resources(s)['stamina'] or 0)<5:
+                self.stamina_retry['main']=True;reason='体力不足5';break
         self.home()
-        reason='体力不足5' if self.stamina_retry['main'] else '达到设置的检查关卡上限' if limit_reached(options['max_nodes'],examined) else '当前搜索范围内没有剩余可通过的未通关节点'
-        locked=len(self.report.get('main_locked',{}))
-        unlocated=len(self.report.get('main_retry_unlocated',[]))
-        retry_note=f'；{unlocated}关未能重新定位，剩余阵容未尝试' if unlocated else ''
-        return f'主线通关{wins}次，检查{examined}关；等级未解锁跳过{locked}关{retry_note}；停止原因：{reason}'
+        return (f'主线通关{wins}次，检查{self.report.get("main_examined",0)}关，搜索{self.report.get("main_searches",0)}次；'
+                f'等级未解锁跳过{len(self.report.get("main_locked",{}))}关；停止原因：{reason}')
 
     def record_locked_main(self,s):
         level=main_unlock_level(s)
@@ -1375,6 +1522,7 @@ class ConfiguredActivities:
 
     def main_overview_detail(self):
         from .workflows import is_world
+        self.count_main_search('玩法概览')
         s=self.enter_overview('^世界关卡$')
         # Some overview arrows only move the camera. The caller continues its
         # bounded local-node search instead of waiting for a nonexistent detail.
@@ -1398,6 +1546,7 @@ class ConfiguredActivities:
             known=self.known_main_node(s,candidate)
             if known is not None and (known in excluded or (wanted is not None and known!=wanted)):continue
             source=s
+            self.count_main_search('地图节点')
             self.click_world(s,candidate,'打开可见未通关节点')
             story_seen=False
             def destination(q):
@@ -1418,6 +1567,7 @@ class ConfiguredActivities:
                     fresh=min(main_nodes(q),key=lambda p:math.dist(p,arrived),default=None) if arrived is not None else None
                     if fresh and math.dist(fresh,arrived)<18:
                         source=q;candidate=fresh
+                        self.count_main_search('抵达节点重读')
                         self.click_world(q,fresh,'抵达后打开主线节点')
                         self.b.sleep(1);q=destination(self.observe())
             if q.find('敌方阵容') and q.find('首通奖励'):
@@ -1560,10 +1710,10 @@ class ConfiguredActivities:
 
     def giant_settlement(self):
         self.battles+=1;self.task_counts['giant']=self.task_counts.get('giant',0)+1
-        until=time.monotonic()+int(self.b.settings.get('battle_timeout_seconds',240));saw_battle=False
-        feedback=time.monotonic();network_retries=0;settle_clicked=False
-        while time.monotonic()<until:
-            q=self.observe_battle();self.b.guard(q)
+        saw_battle=False
+        feedback=time.monotonic();network_retries=0;settle_clicked=False;returned={'started':time.monotonic()}
+        for q in self.battle_frames(int(self.b.settings.get('battle_timeout_seconds',240)),'进击巨物',clock=time.monotonic):
+            self.b.guard(q)
             if self.retry_battle_network(q,network_retries):
                 network_retries+=1;continue
             if q.find('^暂停$|^撤退$|^自动$|^手动$|^X2$|^x2$') or q.find(r'\d+:\d+',roi=(490,0,300,100)):
@@ -1583,10 +1733,14 @@ class ConfiguredActivities:
                 if value is None:raise TaskBlocked('巨物返回排行榜但成绩未读清')
                 self.report.setdefault('battles',[]).append({'resource':'进击巨物免费','result':'score','best_damage':value})
                 return value
+            page=self.battle_return_page(q,returned,ready=saw_battle or settle_clicked)
+            if page:
+                value=giant_damage(q) if q.has('^进击巨物$','^开始挑战$','^我的排名$') else None
+                if value is not None:return value
+                self.raise_battle_returned(q,page)
             if time.monotonic()-feedback>=15:
                 self.note('进击巨物战斗中，等待伤害结算…');feedback=time.monotonic()
             self.b.sleep(2)
-        raise SafetyStop('巨物尚未核实结算，停止并保留现场')
 
     def tower_territory(self,s):
         # Full-frame OCR can drop the 永生之茧 label completely; re-read the
@@ -1727,7 +1881,7 @@ class ConfiguredActivities:
         return q,n
 
     def tower_advance(self,result,kind,n):
-        before=self.b.read_resource_ratio(result,(1140,0,140,65))
+        before=self.dungeon_ratio('tower',result)
 
         def transition(s):
             self.check_tower_level_gate(s,('' if kind['id']=='normal' else kind['label']+'-')+f'浮空巨塔{n}')
@@ -1736,7 +1890,7 @@ class ConfiguredActivities:
                 if tower_floor_number(s,kind)!=n:raise TaskBlocked('下一关塔层不符')
                 return s,False
             if s.find('^退出$'):
-                after=self.b.read_resource_ratio(s,(1140,0,140,65))
+                after=self.dungeon_ratio('tower',s)
                 if before and after and after==(before[0]-1,before[1]):return s,True
             elif s.find('^暂停$|^自动$|^手动$|^X2$|^x2$|^撤退$'):
                 return s,True
@@ -1746,7 +1900,7 @@ class ConfiguredActivities:
             # A fast next fight can already be back on a similar settlement.
             # Only an unchanged, readable feather balance permits another tap.
             return bool(before and s.has('胜利','^获得奖励$','^退出$',r'下一[关层]$') and
-                        self.b.read_resource_ratio(s,(1140,0,140,65))==before)
+                        self.dungeon_ratio('tower',s)==before)
 
         self.note(f'{kind["label"]}直接挑战下一关：{n}层')
         s=result
@@ -1759,7 +1913,14 @@ class ConfiguredActivities:
                     raise TaskBlocked('下一关状态或羽毛余额未确认，未重复点击，保留现场')
                 self.check_budget('tower')
                 self.navigation_retry('下一关点击未推进，重新点击已确认的结算按钮',attempt,s)
-            self.b.click_text(s,r'下一[关层]$',settle_delay=.15)
+            try:self.b.click_text(s,r'下一[关层]$',settle_delay=.15)
+            except (PageChanged,TaskBlocked) as error:
+                fresh=getattr(error,'screen',None) or self.observe();self.b.guard(fresh)
+                changed=transition(fresh)
+                if changed:return changed
+                from .result_navigation import exit_destination
+                if exit_destination(fresh):return self.tower_map(fresh),False
+                raise
             self.report['tower_next_clicks']=self.report.get('tower_next_clicks',0)+1
             stable=0
             for _ in range(8):
@@ -1793,10 +1954,12 @@ class ConfiguredActivities:
         raise TaskBlocked('当前塔秘庭列表未打开')
 
     def verify_tower_secret(self,s,name):
+        from .dungeon_labels import OVERLAY
+        self.b.guard(s)
         button=s.find('^挑战$',roi=(850,590,260,75))
         # In the observed free layout the centered button has no lower cost
         # line. Paid tower buttons shift the title up and show a feather below.
-        if (not s.has('^'+re.escape(name)+'$','首通奖励','敌方阵容') or
+        if (s.find(OVERLAY) or not s.has('^'+re.escape(name)+'$','首通奖励') or not enemy_formation(s) or
                 not button or button.center[1]<625 or
                 re.search(r'\d|钻石|羽毛',s.region_text((900,640,200,25)))):
             raise TaskBlocked('秘庭免费挑战未确认')
@@ -1826,9 +1989,24 @@ class ConfiguredActivities:
             self.b.sleep(.4);s=self.observe()
         raise TaskBlocked('目标秘庭持续移动或未解锁，保留现场')
 
+    def center_secret_nodes(self,s):
+        for attempt in range(4):
+            self.b.guard(s)
+            if not is_tower_secret_list(s):raise TaskBlocked('秘庭居中时列表已改变')
+            edge=next((w for w in secret_nodes(s) if w.box[0]<30 or w.box[0]+w.box[2]>1250),None)
+            if edge is None:return s
+            if attempt==3:raise TaskBlocked('秘庭编号仍贴近屏幕边缘，已居中3次，未点击截断编号')
+            swipe=(1050,430,650,430) if edge.center[0]>640 else (250,430,650,430)
+            self.note('秘庭编号靠近屏幕边缘，先移到中间再重新读取完整编号')
+            self.b.audit({'action':'swipe','reason':'秘庭编号移到中间','from':list(swipe[:2]),'to':list(swipe[2:])})
+            if not self.b.wait(self.b.controller.post_swipe(*swipe,650)).succeeded:
+                raise TaskBlocked('秘庭居中滑动未成功，未点击旧编号')
+            self.b.sleep(.7);s=self.tower_secret_list()
+        return s
+
     def tower_secrets(self,kind,attempted):
         if not self.options['tower']['secret_garden']:return 0
-        self.note('检查本轮已挑战塔的秘庭：'+kind['label'])
+        self.note('检查所选塔的秘庭：'+kind['label'])
         s=self.open_tower(kind)
         if is_tower_map(s) and not is_tower_secret_list(s) and not s.find(r'^塔中秘庭\d+$',roi=(900,500,300,180)):
             # A newly opened race tower may have no secret unlocked yet.
@@ -1844,7 +2022,9 @@ class ConfiguredActivities:
             if last_team!=team:q=self.select_team(q,team);last_team=team
             return q
         while True:
-            self.check_budget('tower')
+            try:self.check_budget('tower')
+            except BudgetReached:break
+            s=self.center_secret_nodes(s)
             names=[x for x in secret_candidates(s) if x not in attempted]
             if not names:
                 if secret_locked_nodes(s):
@@ -1872,22 +2052,25 @@ class ConfiguredActivities:
                                        lambda q:self.verify_tower_secret(q,name),prepare_team=prepare):wins+=1
             except ChallengeLocked as e:
                 self.note(f'{name}需要探索者等级{e.level}，跳过后续秘庭');break
+            except BudgetReached:break
             s=self.tower_secret_list()
-        ratio=self.b.read_resource_ratio(s,(1030,0,170,65))
+        ratio=self.dungeon_ratio('tower',s,(1030,0,170,65))
         if ratio:self.report.setdefault('dungeon_resources',{})['tower']={
             'name':'浮空羽毛','remaining':ratio[0],'reserve':self.options['tower']['reserve_feathers']}
         return wins
 
     def tower(self):
-        wins=0;secrets=0;touched=[];stop_towers=False;locked_towers=[]
+        wins=0;secrets=0;touched=[];stop_towers=False;stop_floors=False;locked_towers=[]
         stop_reason='所选塔的当前可挑战层和秘庭已检查'
+        secret_garden=self.options['tower']['secret_garden']
+        teams=team_order(self.options['tower'])
         self._tower_kind=None
         for kind in selected_rows(self.options['tower'],'towers'):
-            if stop_towers:break
-            self.note('挑战浮空巨塔：'+kind['label'])
-            s=self.open_tower(kind);n=None;started=False;team_index=0;last_team=object()
-            teams=team_order(self.options['tower'])
-            while True:
+            if stop_towers or (stop_floors and not secret_garden):break
+            if not stop_floors:
+                self.note('挑战浮空巨塔：'+kind['label'])
+                s=self.open_tower(kind);n=None;started=False;team_index=0;last_team=object()
+            while not stop_floors:
                 try:
                     self.check_budget('tower');team=teams[team_index]
                     if not started:
@@ -1917,7 +2100,7 @@ class ConfiguredActivities:
                     else:team_index+=1
                     # The balance is shared by every race. A spent last feather
                     # ends the entire floor loop, including failure fallbacks.
-                    ratio=self.b.read_resource_ratio(result,(1140,0,140,65))
+                    ratio=self.dungeon_ratio('tower',result)
                     if ratio:
                         self.verify_dungeon_resource('tower',result)
                     else:
@@ -1939,15 +2122,17 @@ class ConfiguredActivities:
                     if n and n>1 and kind not in touched:
                         touched.append(kind);self.report['tower_visited']=[row['id'] for row in touched]
                     break
+                except ResourceReserveReached as e:
+                    stop_reason=str(e);self.note(stop_reason);stop_floors=True;break
                 except BudgetReached as e:
                     stop_reason=str(e);self.note(stop_reason);stop_towers=True;break
-            # Finish this tower's unlocked free secret rooms before switching
-            # to another race, including when all teams lost the current floor
-            # or the last shared feather was spent on that loss.
-            if self.options['tower']['secret_garden'] and kind in touched:
+            # Each selected tower can have unlocked free secret rooms even
+            # when no regular floor was attempted in this run.
+            if secret_garden and not stop_towers:
                 try:
                     self.check_budget('tower')
                     secrets+=self.tower_secrets(kind,set())
+                    self.check_budget('tower')
                 except BudgetReached as e:
                     stop_reason=str(e);self.note(stop_reason);stop_towers=True
         self.report['tower_summary']={'floors_won':wins,'secrets_won':secrets,
@@ -1956,11 +2141,26 @@ class ConfiguredActivities:
         self.home();return f'巨塔通关{wins}层，秘庭{secrets}关{skipped}；停止原因：{stop_reason}'
 
     def tower_next_floor(self,s):
+        current_pattern='^回到当前$'
+        current_roi=(35,220,140,85)
+
+        def return_to_current(q):
+            if self.tower_navigation_state(q)!='floors':return
+            button=q.find(current_pattern,current_roi)
+            if button:
+                self.b.click_at(q,button.center,['^浮空巨塔$',current_pattern],'回到当前塔层')
+
         for attempt in range(5):
             self.b.guard(s)
-            if not s.find('^浮空巨塔$',roi=(90,0,230,60)):raise TaskBlocked('巨塔地图已改变')
+            if self.tower_navigation_state(s)!='floors':raise TaskBlocked('巨塔地图已改变')
             floor=next_tower_floor(s)
             if floor:return s,floor
+            if s.find(current_pattern,current_roi):
+                self.note('当前塔层不在画面内，点击「回到当前」重新定位')
+                return_to_current(s)
+                s=self.wait_for_screen(lambda q:self.tower_navigation_state(q)=='floors' and next_tower_floor(q) is not None,
+                                       '回到当前塔层并核对相邻层',timeout=4,retry_navigation=return_to_current)
+                return s,next_tower_floor(s)
             if attempt==0:self.note('塔层数字被遮挡，等待重识别下一层')
             self.b.sleep(.8);s=self.observe()
         raise TaskBlocked('下一相邻塔层未读清，未点击更高的未解锁层')
@@ -2047,6 +2247,11 @@ class ConfiguredActivities:
                 self.b.sleep(.5)
             s=q
             if key in self.cocoon_daily_done(s):return None
+            if not s.has('^永生之茧$','^刷新$'):
+                from .dungeon_labels import cocoon_detail_layout
+                if cocoon_detail_layout(s):
+                    raise TaskBlocked('已打开“'+label+'”详情，但敌方阵容局部补读4次仍未确认，不重复点击副本卡片')
+                raise TaskBlocked('点击“'+label+'”后页面未确认，不重复点击副本卡片；该项未记为完成')
         title_rois={'lower_left':(300,565,210,65),'lower_middle':(500,595,280,65),'lower_right':(775,565,220,65)}
         title=s.region_text(title_rois[key]).strip() if key in title_rois else label
         raise TaskBlocked('点击“'+(title or label)+'”后未进入挑战详情，停止重试；该项未记为完成')
@@ -2115,6 +2320,10 @@ class ConfiguredActivities:
         try:
             s=self.open_anomaly_list(s)
             if not is_copy_list(s):raise TaskBlocked('复制体列表未识别')
+        except EncounterInterrupted:
+            # A portal/merchant was just handled. The encounter loop already
+            # reopens fresh rows with a bounded interruption budget.
+            raise
         except TaskBlocked as e:
             if prepared:raise  # The same overview route must not be replayed.
             s=self.overview_entry('copies',reason='异象事件入口未确认（'+str(e)+'）')
@@ -2238,6 +2447,7 @@ class ConfiguredActivities:
         # Identity, ownership and positive rewards are still verified in detail.
         for _ in range(64):
             self.b.guard(s)
+            s=self.claim_visible_copy_rewards(s)
             s,quota=self.read_copy_quota(s)
             s=self.read_copy_names(s)
             self.report['friend_points_text']=s.find(COPY_LIST_ANCHORS[1]).text
@@ -2277,6 +2487,7 @@ class ConfiguredActivities:
 
     def copy_battles(self):
         from .workflows import is_world
+        self.collect_copy_rewards()
         s=self.observe()
         self.stamina_retry['copies']=False
         self.copy_stop_reason='列表中没有剩余可获奖励的目标'
@@ -2287,6 +2498,7 @@ class ConfiguredActivities:
                 self.stamina_retry['copies']=True
                 self.home();return '复制体体力不足20，补充免费体力后再检查目标'
         wins=0;failed=set(self.report.get('copy_failed',[]));self.own_copy_waiting=False
+        path_handoffs=0
         # Own and friend copies share the same formation during this task.
         # Keep this local: a later invocation may follow other tasks or a user
         # change, and must confirm its first configured team again.
@@ -2297,38 +2509,59 @@ class ConfiguredActivities:
                 detail=self.select_team(detail,team);last_team=team
             return detail
         while True:
-            current=self.observe()
-            if is_world(current) or is_copy_list(current):
-                balance=parse_ratio(current.region_text((490,0,170,65)))
-                if balance:self.resource_balance('copies','地图体力',balance[0])
-                if balance and balance[0]<20:
+            target=None
+            try:
+                current=self.observe()
+                if is_world(current) or is_copy_list(current):
+                    balance=parse_ratio(current.region_text((490,0,170,65)))
+                    if balance:self.resource_balance('copies','地图体力',balance[0])
+                    if balance and balance[0]<20:
+                        self.stamina_retry['copies']=True
+                        self.home();return f'复制体通关{wins}次，体力剩余{balance[0]}，不足单次20，停止挑战'
+                self.check_budget('copies');target=self.copy_targets('any',failed)
+                if not target:break
+                detail=target['screen'];ratio=parse_ratio(detail.region_text((1140,0,140,65)))
+                if not ratio:raise TaskBlocked('复制体体力未识别')
+                if ratio[0]<20:
                     self.stamina_retry['copies']=True
-                    self.home();return f'复制体通关{wins}次，体力剩余{balance[0]}，不足单次20，停止挑战'
-            self.check_budget('copies');target=self.copy_targets('any',failed)
-            if not target:break
-            detail=target['screen'];ratio=parse_ratio(detail.region_text((1140,0,140,65)))
-            if not ratio:raise TaskBlocked('复制体体力未识别')
-            if ratio[0]<20:
-                self.stamina_retry['copies']=True
-                self.own_copy_waiting=target['kind']=='own';self.home();return f'复制体通关{wins}次，体力不足20'
-            latest_quota=[target['quota']]
-            def opener():
-                candidate=self.copy_targets('any',failed)
-                if not candidate or candidate['identity']!=target['identity']:raise TaskBlocked('复制体目标发生变化')
-                latest_quota[0]=candidate['quota']
-                return candidate['screen']
-            def verify(q):
-                self.verify_stamina_cost(q,20)
-                if self.copy_kind(q,latest_quota[0])!=target['kind']:raise TaskBlocked('复制体奖励类型或额度未确认')
-            first=[detail]
-            if self.play_encounter('copies',lambda:first.pop() if first else opener(),'地图体力20',verify,
-                                   prepare_team=prepare_copy_team):
-                wins+=1
-                done=self.report.setdefault('copy_completed',[])
-                if target['identity'] not in done:done.append(target['identity'])
+                    self.own_copy_waiting=target['kind']=='own';self.home();return f'复制体通关{wins}次，体力不足20'
+                latest_quota=[target['quota']]
+                def opener():
+                    candidate=self.copy_targets('any',failed)
+                    if not candidate or candidate['identity']!=target['identity']:raise TaskBlocked('复制体目标发生变化')
+                    latest_quota[0]=candidate['quota']
+                    return candidate['screen']
+                def verify(q):
+                    self.verify_stamina_cost(q,20)
+                    if self.copy_kind(q,latest_quota[0])!=target['kind']:raise TaskBlocked('复制体奖励类型或额度未确认')
+                # An already handled path event is not a failed copy fight.
+                # Preserve real failed-team attempts when re-reading the list.
+                used={row.get('team') for row in self.task_attempts('copies')
+                      if row.get('target')==target['identity'] and row.get('outcome')=='failed'}
+                teams=[team for team in team_order(self.options['copies']) if team not in used]
+                first=[detail]
+                if teams and self.play_encounter('copies',lambda:first.pop() if first else opener(),'地图体力20',verify,
+                                               prepare_team=prepare_copy_team,teams_override=teams):
+                    wins+=1
+                    done=self.report.setdefault('copy_completed',[])
+                    if target['identity'] not in done:done.append(target['identity'])
+                    self.checkpoint()
+                else:
+                    failed.add(target['identity']);self.report['copy_failed']=sorted(failed)
+                    if not teams:self.back_detail(detail)
+                path_handoffs=0
+            except EncounterInterrupted as event:
+                path_handoffs+=1
+                self.report.setdefault('copy_path_handoffs',[]).append({
+                    'instance_id':self.report_key('copies'),
+                    'target':target['identity'] if target else None,
+                    'message':str(event),'consecutive':path_handoffs})
+                self._challenge_entry=None;self._overview_ready=None;last_team=object()
                 self.checkpoint()
-            else:
-                failed.add(target['identity']);self.report['copy_failed']=sorted(failed)
+                if path_handoffs>=3:
+                    from .policy import IsolatedTaskError
+                    raise IsolatedTaskError('异象连续3次处理寻路事件后仍未进入目标，本项回退后继续下一任务') from event
+                self.note('异象寻路事件已处理，重新读取列表、目标奖励和体力后继续；已完成目标不重打')
         self.home();return f'复制体通关{wins}次，未通过{len(failed)}个目标；停止原因：{self.copy_stop_reason}'
 
     def stamina_offer(self):
@@ -2351,6 +2584,24 @@ class ConfiguredActivities:
         self.report.setdefault('stamina_refill',{}).update(
             status='running',phase=phase,message=message,claimed=self.report.get('stamina_claims',0))
         self.note(message);self.b.progress(message);self.checkpoint()
+
+    def try_stamina_refill(self,source):
+        """Recover a failed refill locally and leave its consumption record intact."""
+        free=source=='free'
+        unavailable='_stamina_free_unavailable' if free else '_stamina_potions_unavailable'
+        if getattr(self,unavailable,False):return None
+        try:
+            return self.claim_free_stamina() if free else self.use_stamina_potion()
+        except (TaskBlocked,PageChanged) as error:
+            setattr(self,unavailable,True)
+            reason=('stamina_free_reason' if free else 'stamina_potion_reason')
+            setattr(self,reason,str(error))
+            self.report.setdefault('stamina_refill_failures',[]).append({
+                'source':source,'task':self.active_task,'reason':str(error)})
+            self.note(('每日三发' if free else '移动力药水')+'补充失败，回退后继续：'+str(error))
+            self.checkpoint()
+            self.recover_failed_task()
+            return None
 
     def claim_free_stamina(self):
         """Claim one verified free serving; caller already confirmed its outlet."""
@@ -2410,17 +2661,19 @@ class ConfiguredActivities:
                     no_free=True
                     self.note('体力补充：所选玩法暂未找到可继续挑战的目标，本次不领取三发')
                 self.home()
-            if source is None and bottles and not no_potions:
+            if (source is None and bottles and not no_potions and not getattr(self,'_stamina_potions_unavailable',False)
+                    and can_claim_stamina(r['stamina'],r['stamina_cap'])):
                 self.stamina_progress('checking_target','体力补充：正在核对库存药水对应的可挑战目标')
                 if self.stamina_outlet_available(bottles,r['stamina']):source='potion';eligible=bottles
                 else:no_potions=True
                 self.home()
             if source is None:break
             if source=='free':
-                gain=self.claim_free_stamina()
+                gain=self.try_stamina_refill('free')
                 if gain is None:no_free=True;continue
             else:
-                gain=self.use_stamina_potion()
+                self.stamina_progress('opening_inventory','体力补充：正在检查库存移动力药水')
+                gain=self.try_stamina_refill('potion')
                 if gain is None:no_potions=True;continue
                 self.report['stamina_potion_count']=self.report.get('stamina_potion_count',0)+1
                 self.note(f'库存移动力药水实际补充{gain}体力')
@@ -2466,9 +2719,14 @@ class ConfiguredActivities:
                 self.home()
                 if present:return True
             if task=='main':
-                if limit_reached(self.options['main']['max_nodes'],self.report.get('main_examined',0)):continue
-                self.enter_overview('^世界关卡$');s=self.await_detail()
-                available=main_identity(s) not in self.report.get('main_failed',[]) and bool(s.find('^首通奖励$'))
+                if self.main_search_limit_reached():continue
+                excluded=set(self.report.get('main_failed',[]))
+                excluded.update(n for n,e in self.report.get('main_stage_progress',{}).items() if e['cleared'])
+                s=self.main_overview_detail()
+                if s is None:s=self.find_main_candidate(excluded)
+                if s is None:continue
+                identity=main_identity(s)
+                available=identity is not None and identity not in excluded and bool(s.find('^首通奖励$')) and not self.record_locked_main(s)
                 self.home()
                 if available:return True
         return False

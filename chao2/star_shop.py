@@ -4,9 +4,9 @@ import re
 import cv2
 import numpy as np
 from .policy import TaskBlocked, SafetyStop, PageChanged, parse_ratio
-from .star_supply import (monster_roster,blue_roster_cards,blue_monster_info,
+from .star_supply import (monster_roster,blue_roster_cards,blue_monster_info,blue_evolution_unavailable,
                           purple_monster_info,evolution_result_name,evolution_offer,blue_egg_offer,blue_egg_stock,
-                          blue_egg_dialog)
+                          blue_egg_dialog,selected_blue_roster_index)
 
 SPORES = ('进化孢子', '强化孢子')
 
@@ -91,10 +91,19 @@ def spore_purchase_dialog(b, s, name, quantity=1):
     buy = s.find('^购买$', (530, 600, 230, 60))
     if not buy or b.read_number(s, (603, 511, 70, 52)) != quantity:
         return None
-    if b.read_number(s, (640, 646, 55, 32)) != 30*quantity:
-        return None
     if not b.match_template(s, 'star-soul-buy.png', [600, 640, 45, 42], .88):
         return None
+    price=b.read_number(s, (640, 646, 55, 32))
+    if price is None:
+        # The purchase-button decoration can turn "150" into "150_" in
+        # recognition-only OCR. Keep the full price width, exclude the lower
+        # decoration, and require agreement from two different crops. Never
+        # strip non-digits or override a conflicting numeric price.
+        reads=[b.read_text_crop(s,roi).strip() for roi in
+               ((633,646,68,28),(630,648,75,26))]
+        if reads[0]!=reads[1] or not re.fullmatch(r'\d{1,4}',reads[0]):return None
+        price=int(reads[0])
+    if price != 30*quantity:return None
     return buy
 
 
@@ -302,30 +311,62 @@ class StarShop:
         self.checkpoint()
         return after
 
-    def one_blue_roster(self):
-        s=self.territory()
-        self.b.click_text(s,'^怪兽$',roi=(755,630,130,90))
-        s=self.wait_for_screen(lambda q:bool(q.find('^怪兽信息$',(90,0,230,60))),
-                               '怪兽信息')
-        self.b.click_at(s,(60,674),['^怪兽信息$'],'打开按品质排序的怪兽列表')
-        s=self.wait_for_screen(monster_roster,'怪兽列表品质排序')
+    def one_blue_roster(self,*,level_one_only=True,skip_locked=False):
+        # Standalone evolution stays in the roster/info flow after each success.
+        # A world round trip per monster adds loading screens without any need.
+        s=self.wait_for_scene_loading(self.observe()) if not level_one_only else None
+        info=s is not None and (blue_monster_info(self.b,s,require_level_one=False) or
+                               purple_monster_info(self.b,s,require_level_one=False))
+        if s is None or not (info or monster_roster(s)):
+            s=self.territory()
+            self.b.click_text(s,'^怪兽$',roi=(755,630,130,90))
+            s=self.wait_for_screen(lambda q:bool(q.find('^怪兽信息$',(90,0,230,60))),
+                                   '怪兽信息')
+        if not monster_roster(s):
+            self.b.click_at(s,(60,674),['^怪兽信息$'],'打开按品质排序的怪兽列表')
+            s=self.wait_for_screen(monster_roster,'怪兽列表品质排序')
         previous=None
+        checks_left=18*36
+        read_level=self.b.read_text_crop if level_one_only else None
         for page in range(18):
             for retry in range(4):
-                cards=blue_roster_cards(s,self.b.read_text_crop)
-                if any(row['level']==1 for row in cards) or not any(row['level'] is None for row in cards):break
+                cards=blue_roster_cards(s,read_level)
+                if not level_one_only or any(row['level']==1 for row in cards) or not any(row['level'] is None for row in cards):break
                 if retry==3:break
                 self.note(f'蓝色怪兽等级未读清，等待列表稳定后重新识别（{retry+1}/3）')
                 self.b.sleep(.7);s=self.wait_for_screen(monster_roster,'怪兽列表稳定')
-            candidates=[row for row in cards if row['level']==1]
-            if candidates:
-                chosen=candidates[0]
-                self.b.click_at(s,chosen['point'],['^怪兽数量$','^品质$'],'选择1级幻化怪兽')
+            candidates=[row for row in cards if not level_one_only or row['level']==1]
+            page_pixels=s.image[175:675,110:1250].copy()
+            while candidates:
+                if not checks_left:raise TaskBlocked('蓝怪列表反复重新定位，未能核对剩余候选')
+                checks_left-=1
+                chosen=candidates.pop(0)
+                self.b.click_at(s,chosen['point'],['^怪兽数量$','^品质$'],
+                                '选择1级幻化怪兽' if level_one_only else '选择蓝色幻化怪兽')
                 s=self.wait_for_screen(monster_roster,'幻化怪兽已选中')
                 self.b.click_at(s,(1228,106),['^怪兽数量$','^品质$'],'关闭怪兽列表')
-                return self.wait_for_screen(lambda q:blue_monster_info(self.b,q),
-                                            '1级蓝色幻化怪兽信息')
-            if cards and any(row['level'] is None for row in cards):
+                s=self.wait_for_screen(lambda q:blue_monster_info(self.b,q,require_level_one=level_one_only),
+                                       '蓝色幻化怪兽信息')
+                if skip_locked and s.find('^解锁$',(0,80,95,95)):
+                    reason='当前蓝怪已锁定'
+                else:
+                    reason=blue_evolution_unavailable(s)
+                if not reason:return s
+                self.note('蓝怪进化：'+reason+'，继续查找')
+                self.b.click_at(s,(60,674),['^怪兽信息$'],'继续查找未锁定蓝色怪兽')
+                s=self.wait_for_screen(monster_roster,'返回怪兽品质列表')
+                changed=np.max(np.abs(page_pixels.astype('int16')-s.image[175:675,110:1250].astype('int16')),axis=2)>35
+                if changed.mean()>.05:
+                    for read in range(3):
+                        cards=blue_roster_cards(s,read_level)
+                        selected=selected_blue_roster_index(s,cards)
+                        if selected is not None:break
+                        if read<2:s=self.observe();self.b.guard(s)
+                    else:raise TaskBlocked('跳过蓝怪后列表位置改变，未认出已选蓝怪，未重用旧坐标')
+                    candidates=[row for row in cards[selected+1:] if not level_one_only or row['level']==1]
+                    page_pixels=s.image[175:675,110:1250].copy()
+                    self.note('蓝怪列表已重新定位，从已选蓝怪之后继续检查')
+            if level_one_only and cards and any(row['level'] is None for row in cards):
                 raise TaskBlocked('已看到蓝色怪兽但等级未读清，未购买更多怪兽茧')
             pixels=s.image[165:675,110:1250].copy()
             if previous is not None and np.mean(np.abs(pixels.astype('int16')-previous.astype('int16')))<2:
@@ -343,6 +384,7 @@ class StarShop:
         if not (options['buy_star_spores'] and options['convert_star_souls'] and
                 options['evolve_blue_for_star_souls']):
             raise SafetyStop('未开启蓝色怪兽进化饲星')
+        if self.state.get('blue_evolution_pending'):raise TaskBlocked('蓝怪进化紫怪尚待核实，未进行饲星补料')
         if self.day.get('star_evolution_pending'):
             self.complete_star_evolution(self.observe())
             return star_souls(self.b,self.open_star_shop())
@@ -405,7 +447,7 @@ class StarShop:
             self.b.sleep(.5);s=self.observe()
         raise TaskBlocked('进化点击后尚未核实目标究极品级，已记录待核实，不重复进化')
 
-    def close_star_evolution_result(self,s,name):
+    def close_star_evolution_result(self,s,name,*,require_level_one=True):
         def close(q):
             if evolution_result_name(self.b,q)==name:
                 anchors=['^'+re.escape(name)+'$','^详细属性$','^不朽$']
@@ -415,8 +457,8 @@ class StarShop:
             try:self.b.click_at(q,(640,660),anchors,'关闭已完成的怪兽进化展示')
             except PageChanged:pass  # The free dismissal already took effect.
         close(s)
-        return self.wait_for_screen(lambda q:purple_monster_info(self.b,q),
-            '进化展示关闭后返回1级究极怪兽信息',timeout=4,retry_navigation=close)
+        return self.wait_for_screen(lambda q:purple_monster_info(self.b,q,require_level_one=require_level_one),
+            '进化展示关闭后返回究极怪兽信息',timeout=4,retry_navigation=close)
 
     def read_star_offers(self,s):
         for retry in range(4):
@@ -482,6 +524,7 @@ class StarShop:
             raise SafetyStop('未开启自动转化饲星之魂')
         if required <= balance:
             return balance
+        if self.state.get('blue_evolution_pending'):raise TaskBlocked('蓝怪进化紫怪尚待核实，未转化怪兽')
         if self.day.get('star_conversion_pending'):
             raise TaskBlocked('上次饲星转化尚未核实，请检查结果后继续；未重复转化')
         s = self.open_star_shop()
@@ -648,20 +691,17 @@ class StarShop:
         s = self.open_tribe_donation()
         remaining = gold_donation_remaining(s)
         if remaining == (0, 1):
-            self.day['tribe_gold_donated'] = True
-            self.day.pop('tribe_donation_pending', None); self.save_state()
+            if self.options['tribe']['claim_donation_rewards'] and self.b.tasker is not None:
+                self.claim_tribe_donation_rewards(s)
             return {'status':'done', 'count':0, 'spent_gold':0, 'message':'今日金币捐献已完成，剩余0/1，未重复捐献'}
-        if self.day.get('tribe_gold_donated') or self.day.get('tribe_donation_pending'):
-            raise TaskBlocked('本日已有金币捐献记录或未核实操作，未重复捐献')
         point = gold_donation_offer(self.b, s)
         if point is None:
             raise TaskBlocked('左侧金币捐献次数、金币图标或20万费用未确认，未点击')
         gold = self.b.read_text_crop(s, (1064, 7, 70, 42))
         match = re.fullmatch(r'(\d+(?:\.\d+)?)万', gold)
         balance = int(float(match[1])*10000) if match else int(gold) if gold.isdigit() else None
-        if balance is None or balance < 200000:
-            return {'status':'skipped', 'count':0, 'spent_gold':0, 'message':'金币余额不足20万或未读清，未捐献'}
-        self.day['tribe_donation_pending'] = True; self.save_state()
+        if balance is not None and balance < 200000:
+            return {'status':'skipped', 'count':0, 'spent_gold':0, 'message':'金币余额不足20万，未捐献'}
         self.b.click_at(s, point, ['^支配核心$', '^20万$'], '仅使用左侧20万金币捐献')
         for _ in range(10):
             s = self.observe(); self.b.guard(s)
@@ -669,9 +709,9 @@ class StarShop:
                 self.b.click_at(s, (640, 660), ['^获得奖励$', '点击空白位置关闭'], '关闭金币捐献奖励')
                 continue
             if gold_donation_remaining(s) == (0, 1):
-                self.day['tribe_gold_donated'] = True
-                self.day.pop('tribe_donation_pending', None); self.save_state()
+                if self.options['tribe']['claim_donation_rewards'] and self.b.tasker is not None:
+                    self.claim_tribe_donation_rewards(s)
                 return {'status':'done', 'count':1, 'spent_gold':200000,
                         'message':'金币捐献完成1次，消耗20万金币，剩余0/1，钻石支出0'}
             self.b.sleep(.5)
-        raise TaskBlocked('金币捐献结果未确认，已记录待核实，未重复点击')
+        raise TaskBlocked('金币捐献结果未确认，未重复点击')

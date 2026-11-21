@@ -131,11 +131,25 @@ def sage_phase(s):
 
 
 class AnomalyActivities:
+    def click_world_events(self,s,reason):
+        # The upper part of the star icon is transparent to map clicks. The
+        # caption/lower center is inside its actual button, away from portals.
+        roi=(1060,615,100,60)
+        button=s.find('^事件$',roi)
+        if button is None and self.b.tasker is not None:
+            from .backend import Screen
+            s=Screen(s.image,list(s.words),s.when)
+            for scale in (3,4):
+                self.b.confirm_label(s,'^事件$',roi,scale=scale,threshold=.8)
+                button=s.find('^事件$',roi)
+                if button:break
+        self.click_world(s,button.center if button else (1105,646),reason)
+
     def open_world_events(self,s):
         from .activities import is_copy_list
         from .workflows import is_world,is_tasks
         if is_event_panel(s) or is_copy_list(s):return s
-        self.click_world(s,(1105,620),'从世界事件进入异象')
+        self.click_world_events(s,'从世界事件进入异象')
         until=time.monotonic()+18;retry_at=time.monotonic()+3;retried=False
         while time.monotonic()<until:
             q=self.observe();self.b.guard(q)
@@ -147,7 +161,7 @@ class AnomalyActivities:
                 # and retry navigation; it says nothing about wild availability.
                 self.note('返回副本后概览面板重新出现，关闭后再打开事件')
                 q=self.home(q)
-                self.click_world(q,(1105,646),'返回世界后打开事件')
+                self.click_world_events(q,'返回世界后打开事件')
                 retried=True
                 until=time.monotonic()+18
                 continue
@@ -156,15 +170,16 @@ class AnomalyActivities:
             if not retried and time.monotonic()>=retry_at and is_world(q):
                 self.b.save_screen(q,self.report['folder']/'event-open-unconfirmed.png')
                 self.note('事件入口尚未打开，确认仍在世界后重试一次')
-                self.click_world(q,(1105,646),'重试打开世界事件')
+                self.click_world_events(q,'重试打开世界事件')
                 retried=True
             self.b.sleep(.6)
         self.b.save_screen(q,self.report['folder']/'event-open-unconfirmed.png')
         raise TaskBlocked('事件列表未打开，已停止重试；尚未检查到列表内容')
 
-    def open_anomaly_list(self,s):
+    def open_anomaly_list(self,s,*,from_overview=False):
         from .activities import is_copy_list,COPY_LIST_ANCHORS
-        if self.overview_prepared_for('copies'):
+        if is_copy_list(s):return s
+        if self.overview_prepared_for('copies') and not from_overview:
             return self.enter_overview('^异象$')
         if not is_event_panel(s):
             s=self.home(s)

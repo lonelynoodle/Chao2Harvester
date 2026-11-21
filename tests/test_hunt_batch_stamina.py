@@ -4,7 +4,7 @@ import time
 import pytest
 
 from chao2.activities import STAMINA_CLAIM
-from chao2.policy import FightLost, SafetyStop, TaskBlocked, UserStopped
+from chao2.policy import FightLost, TaskBlocked, UserStopped
 from test_configuration import captured, daily, screen
 
 
@@ -95,12 +95,13 @@ def test_existing_hunters_receive_inline_refill_before_next_fight(tmp_path):
     assert state['balance']==89 and state['targets']==0
 
 
-def test_unfunded_existing_batch_spends_usable_stamina_then_stops_other_tasks(tmp_path):
+def test_unfunded_existing_batch_spends_usable_stamina_then_leaves_hunt(tmp_path):
     d,state,actions=hunt_session(tmp_path,targets=3,servings=0,free_searches=0)
-    with pytest.raises(SafetyStop,match='还有2只限时猎物.*没有可领取.*暂停后续任务'):
-        d.hunt()
+    summary=d.hunt()
     assert actions==['open-free','open-hunter','fight']
     assert state['balance']==9 and state['targets']==2 and d.wild_daily_active
+    assert '剩余2只猎物，继续后续任务' in summary
+    assert d.report['hunt_batch']['status']=='stamina_unavailable'
 
 
 def test_refill_respects_hunt_switch_even_when_other_tasks_allow_free_stamina(tmp_path):
@@ -145,9 +146,10 @@ def test_real_potion_flow_confirms_inventory_and_stamina_before_search(tmp_path,
     d.b.click_text=click
     d.observe=lambda:after if state['page']=='potion-result' else original_observe()
     if verification in ('stock_unchanged','stamina_unchanged'):
-        with pytest.raises(SafetyStop,match='未核实'):d.hunt()
-        assert 'search' not in actions and 'fight' not in actions
-        assert d.report['stamina_potions'][0]['status']=='confirming'
+        assert '未核实' in d.hunt()
+        assert actions.count('confirm-one-potion')==1
+        assert d.report['stamina_potions'][0]['status']=='unconfirmed'
+        assert d.report['stamina_refill_failures'][0]['source']=='potion'
     elif verification=='no_potions':
         assert '未开启新一批' in d.hunt()
         assert actions==(['open-free'] if free_enabled else [])+['open-bag']
@@ -170,14 +172,20 @@ def test_funded_batch_does_not_open_free_page_and_defeat_still_advances(tmp_path
     assert d.report['resource_usage']['hunt']['狩猎令']['spent']==1
 
 
-@pytest.mark.parametrize('constraint',['battle','time','capacity','three_claims'])
+@pytest.mark.parametrize('constraint',['battle','capacity','three_claims'])
 def test_batch_preflight_blocks_without_claiming_or_searching(tmp_path,constraint):
     d,state,actions=hunt_session(tmp_path,cap=60 if constraint=='capacity' else 166)
     if constraint=='battle':d.limit=50;d.battles=48  # An explicit internal bound, no longer the daily default.
-    if constraint=='time':d.start_time=time.monotonic()-90*60+599
     if constraint=='three_claims':d.report['stamina_claims']=3
     assert '未开启新一批' in d.hunt()
     assert not actions and state['balance']==19
+
+
+def test_old_run_time_threshold_does_not_block_a_funded_hunt_batch(tmp_path):
+    d,state,actions=hunt_session(tmp_path)
+    d.start_time=time.monotonic()-90*60+599
+    assert '通关3次' in d.hunt()
+    assert actions.count('fight')==3 and actions.count('search')==1
 
 
 def test_search_primitive_also_rejects_19_stamina(tmp_path):
@@ -199,9 +207,9 @@ def test_unverified_claim_is_not_repeated_or_used_to_activate_search(tmp_path):
     d,state,actions=hunt_session(tmp_path)
     def no_gain(*a,**kw):actions.append('claim-unverified')
     d.b.click_text=no_gain
-    with pytest.raises(TaskBlocked,match='到账未核实'):d.hunt()
+    assert '到账未核实' in d.hunt()
     assert actions==['open-free','claim-unverified'] and state['targets']==0
-    with pytest.raises(TaskBlocked,match='不重复领取'):d.claim_free_stamina()
+    assert d.claim_free_stamina() is None
     assert actions==['open-free','claim-unverified']
 
 

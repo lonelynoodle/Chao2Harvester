@@ -1,6 +1,7 @@
 """Regression cases from the 2026-10-13 run; all input is simulated."""
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -26,6 +27,51 @@ def test_tower_unreadable_gap_stops_without_clicking(tmp_path):
     d=daily(tmp_path);d.b.sleep=lambda _:None;d.observe=lambda:s
     d.b.click_at=lambda *a:pytest.fail('Must not guess a locked floor')
     with pytest.raises(TaskBlocked,match='相邻塔层'):d.tower_next_floor(s)
+
+
+@pytest.mark.parametrize('drop_first_click',[False,True])
+def test_tower_recenters_old_floors_and_opens_only_the_verified_next_floor(tmp_path,monkeypatch,drop_first_click):
+    old=screen(('浮空巨塔',124,14,92,28),('回到当前',61,256,83,24),
+               ('0050',270,60,120,44),('已通关',293,22,77,32))
+    current=screen(('浮空巨塔',124,14,92,28),('0051',270,373,120,44),
+                   ('0050',270,530,120,44),('已通关',293,492,77,32))
+    detail=screen(('祖龙族-浮空巨塔51',220,90,225,35))
+    d=daily(tmp_path);clicks=[]
+    d.b.sleep=lambda _:None
+    d.resolve_path_event=lambda _:None
+    ticks=iter(range(40))
+    monkeypatch.setattr('chao2.navigation_retry.time',SimpleNamespace(monotonic=lambda:next(ticks)))
+    d.observe=lambda:current if len(clicks)>drop_first_click else old
+    d.await_detail=lambda:detail
+
+    def click(s,point,anchors,reason):
+        if reason=='回到当前塔层':
+            assert s is old and point==(102,268)
+        else:
+            assert s is current and point==(505,395)
+        assert s.has(*anchors)
+        clicks.append(reason)
+
+    d.b.click_at=click
+    assert d.tower_open_floor(old,{'id':'dragon','label':'祖龙族'})==(detail,51)
+    assert clicks==['回到当前塔层']*(1+drop_first_click)+['打开祖龙族第51层']
+
+
+def test_tower_does_not_reclick_after_return_to_current_disappears(tmp_path,monkeypatch):
+    old=screen(('浮空巨塔',124,14,92,28),('回到当前',61,256,83,24),
+               ('0050',270,60,120,44),('已通关',293,22,77,32))
+    gap=screen(('浮空巨塔',124,14,92,28),('0052',270,218,120,44),
+               ('0050',270,530,120,44),('已通关',293,492,77,32))
+    d=daily(tmp_path);clicks=[]
+    d.b.sleep=lambda _:None
+    d.resolve_path_event=lambda _:None
+    ticks=iter(range(100))
+    monkeypatch.setattr('chao2.navigation_retry.time',SimpleNamespace(monotonic=lambda:next(ticks)))
+    d.observe=lambda:gap
+    d.b.click_at=lambda s,point,anchors,reason:clicks.append(reason)
+    with pytest.raises(TaskBlocked,match='核对相邻层'):
+        d.tower_next_floor(old)
+    assert clicks==['回到当前塔层']
 
 
 @pytest.mark.parametrize('stock',[0,4,None])

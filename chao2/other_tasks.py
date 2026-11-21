@@ -9,7 +9,9 @@ import re
 import numpy as np
 from PIL import Image
 
+from .daily_upgrades import DailyUpgrades
 from .policy import TaskBlocked,parse_ratio
+from .policy import UserStopped,SessionUnavailable
 
 
 FRIEND_EXCHANGE=r'^[一－—-]?键(?:赠送|收取|领取)(?:并收取)?$'
@@ -207,7 +209,7 @@ def is_channel_account_panel(s):
                 s.find('^自动登录$',(100,550,170,80)))
 
 
-class OtherTasks:
+class OtherTasks(DailyUpgrades):
     def close_channel_account_panel(self,s):
         if not is_channel_account_panel(s):return s
         # The SDK drawer occupies x=0..720. Tap only the observed outside
@@ -548,12 +550,15 @@ class OtherTasks:
             if options['remove_inactive_friends']:jobs.append(('inactive_friends',self.clear_inactive_friends))
             if options['auto_add_friends']:jobs.append(('add_friends',self.add_friends_to_capacity))
         if options['collect_daily_single']:jobs.append(('daily_single',self.collect_daily_single))
+        if options['daily_core_upgrade']:jobs.append(('daily_core_upgrade',self.daily_core_upgrade))
+        if options['daily_monster_upgrade']:jobs.append(('daily_monster_upgrade',self.daily_monster_upgrade))
         if options['collect_plane_lord']:jobs.append(('plane_lord',self.collect_plane_lord))
         if options['collect_contract']:jobs.append(('contract',self.collect_contract))
         if options['piggy_bank']:jobs.append(('piggy_bank',self.collect_piggy_bank))
         if options['buy_star_spores']:jobs.append(('star_spores',self.buy_star_spores))
         if options['tribe_gold_donation']:jobs.append(('tribe_gold_donation',self.tribe_gold_donation))
         if options['open_monster_boxes']:jobs.append(('monster_boxes',self.open_monster_boxes))
+        if options['evolve_blue_monsters']:jobs.append(('blue_evolution',self.evolve_blue_monsters))
         if options['clear_bag_notifications']:jobs.append(('bag',self.clear_bag_notifications))
         if options['challenge_abyss']:jobs.append(('abyss',self.challenge_abyss))
         results=self.report.setdefault('other_tasks',{});failures=[]
@@ -564,9 +569,11 @@ class OtherTasks:
             if prior.get(key,{}).get('status') in ('done','skipped'):
                 results[key]=prior[key];continue
             try:result=self.with_page_recovery(run,'其他任务：'+key)
-            except TaskBlocked as error:
+            except (UserStopped,SessionUnavailable):raise
+            except Exception as error:
                 result={**results.get(key,{}),'status':'blocked','message':str(error)};failures.append(key)
                 if hasattr(self,'last_screen'):self.b.save_screen(self.last_screen,self.report['folder']/(key+'-blocked.png'))
-            results[key]=result;prior[key]=result;self.note(result['message']);self.checkpoint();self.home()
+            results[key]=result;prior[key]=result;self.note(result['message']);self.checkpoint()
+            self.recover_failed_task() if result.get('status')=='blocked' else self.home()
         if failures:raise TaskBlocked('其他任务部分未完成：'+'、'.join(failures))
         return '；'.join(results[key]['message'] for key,_ in jobs) if jobs else '其他任务的子任务均未开启'

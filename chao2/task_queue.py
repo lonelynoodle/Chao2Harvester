@@ -4,6 +4,43 @@ from copy import deepcopy
 from .configuration import plan_tasks,STAMINA_TASKS
 
 
+def single_task_request(settings,instance_id):
+    """Run exactly this instance, even unchecked, without editing its template."""
+    if not isinstance(instance_id,str) or not instance_id:raise ValueError('单条任务实例编号无效')
+    queue=settings.get('task_queue')
+    if not isinstance(queue,list):raise ValueError('仅运行本条需要任务队列')
+    matches=[row for row in queue if row.get('id')==instance_id]
+    if len(matches)!=1:raise ValueError('单条任务已不存在或实例编号重复，请重新选择')
+    scoped=deepcopy(settings);row=deepcopy(matches[0]);row['enabled']=True
+    scoped['task_queue']=[row];scoped['tasks']=[row['key']]
+    scoped['unordered_tasks']=False;scoped['close_mumu']=False
+    scoped['free_summon_enabled']=False
+    scoped['wild_capture_enabled']=False
+    return scoped,[row['key']]
+
+
+def continuation_request(settings,selected,instance_id):
+    """Scope one run to a queue suffix without changing the saved template."""
+    if not isinstance(instance_id,str) or not instance_id:
+        raise ValueError('起始任务实例编号无效')
+    queue=settings.get('task_queue')
+    if not isinstance(queue,list):
+        raise ValueError('从此任务开始需要任务队列')
+    matches=[i for i,row in enumerate(queue) if row.get('id')==instance_id]
+    if len(matches)!=1:
+        raise ValueError('起始任务已不存在或实例编号重复，请重新选择')
+    index=matches[0]
+    if not queue[index].get('enabled',True) or queue[index]['key'] not in selected:
+        raise ValueError('起始任务未勾选，请先勾选再开始')
+    scoped=deepcopy(settings)
+    scoped['task_queue']=scoped['task_queue'][index:]
+    remaining=list(dict.fromkeys(row['key'] for row in scoped['task_queue']
+                                if row.get('enabled',True) and row['key'] in selected))
+    scoped['tasks']=remaining.copy()
+    scoped['unordered_tasks']=False
+    return scoped,remaining
+
+
 def execution_entries(settings,selected,order):
     if 'task_queue' not in settings:
         return [{'id':key,'key':key} for key in plan_tasks(settings,selected,order)]
@@ -43,7 +80,7 @@ class TaskQueueExecution:
         state=states.setdefault(ident,{'search_counts':{},'stamina_retry':{},'details':{}})
         self.search_counts,self.stamina_retry=state['search_counts'],state['stamina_retry']
         before_searches=dict(self.search_counts)
-        scoped={'main':('main_examined','main_failed','main_retry_unlocated'),'copies':('copy_failed',),
+        scoped={'main':('main_examined','main_failed','main_seen','main_searches','main_search_history','main_stage_progress'),'copies':('copy_failed',),
                 'cocoon':('cocoon_counts','cocoon_failed','cocoon_unavailable','cocoon_refreshes')}.get(key,())
         for field in scoped:
             self.report.pop(field,None)

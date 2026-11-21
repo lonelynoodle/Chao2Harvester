@@ -7,6 +7,14 @@ import numpy as np
 
 TOTEM_REWARD = r'^每次挑战奖励$'
 
+def tribe_result(s):
+    if not s.has('^退出$','^获得奖励$'):return False
+    return bool(s.find('重复挑战') or (
+        s.find('^结算$',(0,180,550,310)) and
+        s.find('^掉落拍卖品$',(1050,30,230,90)) and
+        s.find('^获得奖励$',(800,280,350,110)) and
+        s.find('^退出$',(900,500,380,220))))
+
 
 def totem_score(s):
     return bool(s.find('^结算$',(0,180,550,310)) and

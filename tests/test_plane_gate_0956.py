@@ -23,10 +23,16 @@ def test_captured_portal_is_an_overlay_and_x_is_read_from_pixels():
     assert not is_world(s)  # Readable HUD behind the popup cannot authorize map clicks.
 
 
-@pytest.mark.parametrize('missing',['歼误之门','解锁条件:世界总探索度到达125%','进入'])
+@pytest.mark.parametrize('missing',['歼误之门','进入'])
 def test_missing_own_anchors_cannot_authorize_portal_close(missing):
     s=captured('v0956-plane-gate',True);s.words=[w for w in s.words if w.text!=missing]
     assert plane_gate_window(s) is None and plane_gate_close(s) is None
+
+
+def test_requirement_is_optional_with_title_entry_and_verified_x():
+    s=captured('v0956-plane-gate',True)
+    s.words=[w for w in s.words if not w.text.startswith('解锁条件')]
+    assert plane_gate_window(s) and plane_gate_close(s).center==(1038,78)
 
 
 @pytest.mark.parametrize('label',['取消','确定','购买','获得奖励','排阵','退出'])

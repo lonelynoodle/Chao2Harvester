@@ -67,6 +67,33 @@ def test_contract_partial_claims_survive_failure_and_bag_still_runs(tmp_path):
     assert d.report['other_tasks']['contract']['task_batches']==1
     assert d.report['other_tasks']['bag']['status']=='done'
 
+def test_contract_closes_resource_details_and_retries_from_world(tmp_path):
+    d=daily(tmp_path)
+    world=screen(('任务挑战',1200,23,70,26),('世界回响',1200,120,70,25),
+                 ('宝藏',1210,321,44,22),('28/193',510,6,80,28))
+    panel=screen(('主要获得途径',413,340,128,22),('已拥有1234567',494,144,130,18),
+                 ('购买',404,390,58,33))
+    treasure=screen(('宝藏',105,13,75,29),('蜕变契约',580,665,120,30))
+    contract=deepcopy(treasure)
+    contract.words+=screen(('契约等级',254,85,100,28),('任务',1206,390,47,29)).words
+    state=[world];clicks=[]
+    d.observe=lambda:state[0]
+    def click(q,point,anchors,reason):
+        clicks.append((point,reason))
+        if reason=='关闭资源说明':
+            assert q is panel
+            state[0]=world
+        elif reason=='打开宝藏中的蜕变契约':
+            assert q is world and point==(1232,332)
+            state[0]=panel if len(clicks)==1 else treasure
+        else:pytest.fail(reason)
+    def select(s,pattern,**kwargs):
+        assert s is treasure and pattern=='^蜕变契约$'
+        state[0]=contract
+    d.b.click_at=click;d.b.click_text=select
+    assert d.contract_menu() is contract
+    assert [point for point,_ in clicks]==[(1232,332),(640,650),(1232,332)]
+
 
 def test_contract_claims_all_task_categories_before_rewards_and_no_purchase(tmp_path):
     d=daily(tmp_path);tasks=captured('reward-contract-tasks',pixels=True)

@@ -39,8 +39,8 @@ def test_invalid_puzzle_options_rejected_before_input(settings):
     with pytest.raises(ValueError):puzzle_options(settings)
 
 def test_tour_settings_reuse_ordered_teams_and_have_a_real_limit():
-    assert tour_options({})=={'teams':[1,2,3],'max_battles':100}
-    assert tour_options({'tour_options':{'teams':[],'max_battles':1}})=={'teams':[],'max_battles':1}
+    assert tour_options({})=={'teams':[1,2,3],'wall_mode':'ignore','max_battles':100}
+    assert tour_options({'tour_options':{'teams':[],'max_battles':1}})=={'teams':[],'wall_mode':'ignore','max_battles':1}
     for bad in [{'teams':[1,1]},{'max_battles':0},{'max_battles':True},{'teams':[6]}]:
         with pytest.raises(ValueError):tour_options({'tour_options':bad})
 

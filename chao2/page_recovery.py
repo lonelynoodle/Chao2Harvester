@@ -30,6 +30,8 @@ def visual_return_control(s):
 
 
 def navigation_failure(error):
+    from .policy import ResourceReadError,IsolatedTaskError
+    if isinstance(error,(ResourceReadError,IsolatedTaskError)):return False
     if isinstance(error,PageChanged):return True  # No click was sent.
     if not isinstance(error,TaskBlocked):return False
     text=str(error)
@@ -46,21 +48,7 @@ class PageRecovery:
         return True
 
     def with_page_recovery(self,run,label):
-        for attempt in range(4):
-            try:return run()
-            except (PageChanged,TaskBlocked) as error:
-                if attempt==3 or not self.can_recover_page(error):raise
-                rows=self.report.setdefault('page_recoveries',[])
-                row={'task':self.active_task,'instance_id':self.report_key(self.active_task),
-                     'label':label,'attempt':attempt+1,'reason':str(error),'status':'returning',
-                     'attempts_before':dict(self.task_counts),'battles_before':self.battles}
-                rows.append(row)
-                screen=getattr(error,'screen',None) or getattr(self,'last_screen',None)
-                if screen is not None:self.b.save_screen(screen,self.report['folder']/f'page-recovery-{len(rows)}.png')
-                self.note(f'{label}页面识别失败，逐级返回后重新进入（{attempt+1}/3）')
-                self.checkpoint();self._overview_ready=None;self._challenge_entry=None
-                wild=getattr(self,'wild_daily_active',False);self.wild_daily_active=False
-                try:self.home()
-                finally:self.wild_daily_active=wild
-                row['status']='reentered';self.checkpoint()
-        raise TaskBlocked(label+'页面恢复次数已用完')
+        # Individual screen/button readers own their bounded retries. Once an
+        # error reaches a task boundary, abandon that task rather than replay
+        # its earlier challenges or transactions after returning home.
+        return run()

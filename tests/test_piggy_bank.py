@@ -7,7 +7,7 @@ from chao2.backend import Backend,ROOT
 from chao2.configuration import normalize_settings
 from chao2.piggy_bank import (LEFT_CLAIM,is_piggy_page,
     piggy_purchase_confirmation,read_piggy_view,read_piggy_offer,piggy_claim_offer)
-from chao2.policy import SafetyStop,TaskBlocked
+from chao2.policy import SafetyStop,TaskBlocked,IsolatedTaskError
 from test_configuration import captured,daily
 
 
@@ -80,6 +80,7 @@ def simulation(tmp_path,*,stored=230,stock=0,wallet=9205,buy_stuck=False,claim_s
         name={'offer':'buy-dialog','claim_offer':'claim-offer','page':'page'}[state['mode']]
         return captured('v0951-piggy-'+name)
     d.observe=observe;d.activity_tab=lambda name:observe()
+    d.b.observe=observe
     d.piggy_view=lambda s=None:(observe(),{'stored':state['stored'],'gold':state['stored']*1000,
         'stock':state['stock'],'quantity':1})
     d.wait_for_screen=lambda predicate,*a,**kw:observe() if predicate(observe()) else None
@@ -107,6 +108,7 @@ def simulation(tmp_path,*,stored=230,stock=0,wallet=9205,buy_stuck=False,claim_s
             state['claims']+=1
             if not claim_stuck:
                 state['stock']-=1;state['stored']-=200;state['wallet']+=200;state['mode']='page'
+        elif pattern=='^取消$':state['mode']='page'
         else:raise AssertionError(pattern)
     d.b.click_text=click
     return d,state
@@ -153,13 +155,13 @@ def test_insufficient_diamonds_skips_purchase(tmp_path):
 ])
 def test_uncertain_result_is_journaled_and_never_replayed_after_restart(tmp_path,case,phase,counts):
     d,state=simulation(tmp_path,**case)
-    with pytest.raises(SafetyStop):d.collect_piggy_bank()
+    with pytest.raises(IsolatedTaskError):d.collect_piggy_bank()
     assert (state['purchases'],state['claims'])==counts
     saved=json.loads(d.state_file.read_text('utf-8'))
     assert saved['piggy_pending']['phase']==phase
     restarted,_=simulation(tmp_path)
     restarted.state=saved
-    with pytest.raises(SafetyStop,match='上次'):restarted.collect_piggy_bank()
+    with pytest.raises(IsolatedTaskError,match='上次'):restarted.collect_piggy_bank()
     assert (state['purchases'],state['claims'])==counts
 
 
@@ -175,14 +177,14 @@ def test_disabled_feature_rejects_direct_invocation(tmp_path):
     with pytest.raises(SafetyStop,match='未开启'):d.collect_piggy_bank()
 
 
-def test_post_purchase_ocr_failure_stops_all_work_and_keeps_transaction(tmp_path):
+def test_post_purchase_ocr_failure_is_isolated_and_keeps_transaction(tmp_path):
     d,state=simulation(tmp_path)
     original=d.piggy_view
     def read(s=None):
         if state['purchases']:raise TaskBlocked('木锤库存未读清')
         return original(s)
     d.piggy_view=read
-    with pytest.raises(SafetyStop,match='交易已提交'):d.collect_piggy_bank()
+    with pytest.raises(IsolatedTaskError,match='交易已提交'):d.collect_piggy_bank()
     assert state['purchases']==1 and state['claims']==0
     assert d.state['piggy_pending']['phase']=='buy_requested'
 

@@ -146,8 +146,10 @@ def merchant_return_page(s):
     from .activities import is_copy_list
     from .anomalies import is_event_panel
     from .world_events import is_ambush,is_map_choice
+    from .plane_gate import plane_gate_window
     if merchant_title(s) or s.find('^获得奖励$',(400,75,500,150)):
         return None
+    if plane_gate_window(s):return 'plane_gate'
     if is_world(s):
         return 'world'
     if is_ambush(s):

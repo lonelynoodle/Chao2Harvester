@@ -213,7 +213,7 @@ def test_empty_team_list_uses_current_formation(tmp_path):
 
 
 def test_invalid_options_rejected():
-    assert abyss_options({}) == {'teams': [1, 2, 3]}
+    assert abyss_options({}) == {'teams': [1, 2, 3], 'wall_mode': 'ignore'}
     for raw in ('bad', {'teams': [1, 1]}, {'teams': [True]}, {'teams': [6]}):
         with pytest.raises(ValueError):
             abyss_options({'abyss_options': raw})

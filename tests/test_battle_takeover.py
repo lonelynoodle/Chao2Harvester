@@ -98,13 +98,15 @@ def test_stop_during_wait_remains_responsive_without_game_input(tmp_path):
     assert g['clicks']==[] and d.report['battle_takeovers'][0]['status']=='stopped'
 
 
-def test_unfinished_battle_times_out_honestly_without_retreat(tmp_path,monkeypatch):
+def test_long_battle_keeps_waiting_without_retreat(tmp_path,monkeypatch):
     import chao2.battle_takeover as module
-    d,g=simulation(tmp_path,[tower()]);clock=[0]
+    d,g=simulation(tmp_path,[tower() for _ in range(16)]+[victory()]);clock=[0]
     monkeypatch.setattr(module,'time',SimpleNamespace(monotonic=lambda:clock[0]))
     d.b.sleep=lambda seconds:clock.__setitem__(0,clock[0]+60)
-    with pytest.raises(TaskBlocked,match='等待结算超时'):d.finish_existing_battle(tower())
-    assert g['clicks']==[] and d.report['battle_takeovers'][0]['status']=='blocked'
+    d.finish_existing_battle(tower())
+    assert clock[0]>720 and g['clicks']==['退出']
+    assert d.report['battle_takeovers'][0]['status']=='settled'
+    assert d.report['battle_wait_extensions']
     assert any('等待结束' in row['message'] for row in d.report['events'])
 
 

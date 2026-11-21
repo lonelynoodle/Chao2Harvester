@@ -74,14 +74,15 @@ class ChallengeStartRecovery:
             return pending[1]
         return self.observe()
 
-    def start_challenge(self,task,detail,resource,verify=None):
+    def start_challenge(self,task,detail,resource,verify=None,*,keep_current_wall=False):
+        if not keep_current_wall:detail=self.prepare_battle_wall(task,detail)
         self._challenge_entry=None;self.active_task=task
         self.b.guard(detail)
         if task in self.options:self.check_budget(task)
         else:self.b.check_stop()
         if not is_challenge_ready(detail):raise TaskBlocked('开战前挑战详情未确认')
         identity=challenge_identity(detail,task)
-        before=self.b.read_resource_ratio(detail,(1140,0,140,65))
+        before=self.dungeon_ratio(task,detail)
         free='免费' in resource
         row={'task':task,'instance_id':getattr(self,'active_task_id',None),
              'target':identity,'status':'pending','clicks':0,'resource_before':before}
@@ -101,7 +102,7 @@ class ChallengeStartRecovery:
             return bool(identity and is_challenge_ready(q) and challenge_identity(q,task)==identity)
 
         def unchanged_balance(q):
-            after=self.b.read_resource_ratio(q,(1140,0,140,65))
+            after=self.dungeon_ratio(task,q)
             row['resource_last_observed']=after
             return after==before if before is not None else free
 
@@ -122,6 +123,9 @@ class ChallengeStartRecovery:
         def observe_path():
             from .world_events import is_map_choice
             q=self.observe();self.b.guard(q);self.resolve_path_event(q)
+            if task=='nest':
+                from .daily_challenges import rampage_selector
+                if rampage_selector(q):q=self.rampage_ready(q)
             if task=='hunt' and is_map_choice(q):
                 # Pathing can end at a node shared with a normal world stage.
                 # Choose only the unique hunt row, then re-check the original
@@ -138,7 +142,7 @@ class ChallengeStartRecovery:
                 if confirmed(s):return s
                 same=same_source(s)
                 if same:
-                    after=self.b.read_resource_ratio(s,(1140,0,140,65))
+                    after=self.dungeon_ratio(task,s)
                     row['resource_last_observed']=after
                     if before and after and after[0]<before[0]:
                         if not charged:self.note('挑战资源已扣除，等待战斗画面，不再重复点击')

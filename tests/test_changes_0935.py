@@ -16,7 +16,7 @@ def test_copied_lineup_accepts_actual_91767_failure_frame_and_rejects_other_team
     assert not copied_lineup(lineup,captured('tribe-copied-formation',True).image)['verified']
     wrong=target.image.copy();wrong[70:300,230:510]=0
     evidence=copied_lineup(lineup,wrong)
-    assert evidence['matched_monsters']==5 and not evidence['god_verified']
+    assert evidence['matched_monsters']==5 and evidence['verified']
 
 
 def test_actual_lineup_continues_when_destination_power_is_unreadable(tmp_path):

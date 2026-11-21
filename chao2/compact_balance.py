@@ -27,6 +27,21 @@ def balance_delta_possible(before,after,delta):
     lo,hi=balance_bounds(before);a,z=balance_bounds(after)
     return max(lo+delta,a)<=min(hi+delta,z)
 
+def read_fixed_balance(b,s,roi):
+    """Read the complete HUD field, not a possibly truncated full-frame box."""
+    confirmed=None;reads=[]
+    for scale in (3,4,2):
+        raw=b.read_text_region(s,roi,scale=scale,threshold=.8)
+        text=re.sub(r'\s','',raw);value=displayed_balance(text)
+        reads.append(f'{scale}倍={raw!r}')
+        if value is None:continue
+        if confirmed is not None:
+            if text==confirmed[0]:return value
+            break
+        confirmed=(text,value)
+    raise TaskBlocked('钻石余额固定区域未读清或局部识别不一致（'+'；'.join(reads)+'）')
+
+
 def read_displayed_balance(b,s,roi):
     word=s.find(BALANCE_PATTERN,roi)
     if not word or word.score<.8:raise TaskBlocked('钻石余额未读清')

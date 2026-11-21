@@ -38,7 +38,7 @@ def test_migration_preserves_choices_and_connection_without_enabling_new_tasks()
     assert old=={'address':'127.0.0.1:9999','tasks':['copies'],'close_mumu':False,'custom_key':'keep'}
     assert set(new['task_options'])==set(ORDER)|{'giant','triad'}
     assert 'include_friends' in new['task_options']['copies']
-    assert set(new['task_options']['copies'])=={'teams','max_runs','include_friends','challenge_copies','wandering_sage','sage_until_end','auto_three_shots','auto_potions'}
+    assert set(new['task_options']['copies'])=={'teams','wall_mode','max_runs','include_friends','challenge_copies','wandering_sage','sage_until_end','auto_three_shots','auto_potions'}
 
 def test_stamina_priority_filters_disabled_tasks_and_preserves_other_task_order():
     s=normalize_settings({'stamina_order':['main','copies','hunt']})
@@ -134,6 +134,7 @@ def test_actual_encounter_rotation_obeys_total_attempt_budget(tmp_path):
 
 def test_disabled_secret_garden_never_enters_it_even_with_feathers_zero(tmp_path):
     d=daily(tmp_path);d.options['tower']['secret_garden']=False
+    d.b.tasker=object();d.b.read_text_region=lambda *a,**kw:'0/20'
     d.options['tower']['towers']=[{'id':'dragon','label':'祖龙族','enabled':True}]
     opened=[]
     def open_tower(kind):opened.append(kind['id']);return screen(('浮空巨塔',124,14,90,30),('0/20',1124,15,56,26),('塔中秘庭31',950,580,160,36))
@@ -253,6 +254,8 @@ def configure_fake_dungeon(d,task,balance,outcome='victory'):
     d.observe=lambda *args:result() if state['page']=='result' else menu() if task=='tower' and state['page']=='menu' else detail()
     d.await_detail=lambda:detail()
     if task=='tower':
+        d.b.tasker=object()
+        d.b.read_text_region=lambda *a,**kw:f'{state["balance"]}/20'
         d.options[task]['secret_garden']=False
         d.options[task]['towers']=[{'id':'normal','label':'无限制','enabled':True}]
         d.open_tower=lambda _:menu()
@@ -286,11 +289,11 @@ def test_failed_fight_does_not_spend_reserve_on_fallback_team(tmp_path,task):
     assert state['inputs']==1 and state['balance']==3
     assert [(a['team'],a['outcome']) for a in d.report['team_attempts']]==[(1,'failed')]
 
-def test_untouched_tower_does_not_check_secrets_at_feather_reserve(tmp_path):
+def test_tower_checks_secrets_while_leaving_feathers_at_reserve(tmp_path):
     d=daily(tmp_path);d.options['tower']['reserve_feathers']=5
     state=configure_fake_dungeon(d,'tower',5);d.options['tower']['secret_garden']=True
     called=[];d.tower_secrets=lambda kind,attempted:called.append(kind['id']) or 1
-    assert '秘庭0关' in d.tower() and called==[]
+    assert '秘庭1关' in d.tower() and called==['normal']
     assert state['inputs']==0 and state['balance']==5
 
 @pytest.mark.parametrize('task',['tower','cocoon'])

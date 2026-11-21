@@ -41,7 +41,10 @@ def test_frontend_manifest_matches_real_tasks():
 def test_real_worker_initializes_and_reports_error_while_stdin_remains_open(tmp_path,reserved):
     """Regress the Windows NumPy-import/stdin-listener deadlock; no ADB exists here."""
     root=Path(__file__).resolve().parents[1]
-    request={'mode':'diagnostic','settings':{'adb':str(tmp_path/'missing-adb.exe')},'selected':[]}
+    # An offline initialization check must not share the real MuMu control
+    # lease. The missing executable prevents any ADB connection or input.
+    request={'mode':'diagnostic','settings':{'adb':str(tmp_path/'missing-adb.exe'),
+             'address':'offline-gui-bridge:'+tmp_path.name},'selected':[]}
     environment={**os.environ,'PYTHONUTF8':'1','CHAO2_REPORT_ROOT':str(tmp_path/'reports')}
     if reserved:
         folder=tmp_path/'reports'/'2026_10_26_04_04_54';folder.mkdir(parents=True)
@@ -67,7 +70,7 @@ def test_real_worker_initializes_and_reports_error_while_stdin_remains_open(tmp_
             events.append(event)
             if event['kind']=='result':break
         else:pytest.fail('Real worker stalled with open stdin: '+''.join(errors))
-        assert events[0]['kind']=='log' and '初始化' in events[0]['data']
+        assert events[0]['kind']=='log' and '初始化' in events[0]['data'],events
         assert any(e['kind']=='log' and e['data']=='识图组件已就绪' for e in events)
         assert any(e['kind']=='phase' and '连接 MuMu' in e['data'] for e in events)
         assert events[-1]['data']['status']=='blocked'

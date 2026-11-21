@@ -1,4 +1,4 @@
-"""Verify a copied lineup from the five selected portrait cards and the god.
+"""Verify a copied lineup from the five selected portrait cards.
 
 Power is an OCR hint only. Portrait matching uses the current source row and
 fresh destination pixels, so an old full lineup cannot pass just by counting
@@ -7,6 +7,25 @@ five cards. Card order may differ in the inventory strip.
 import cv2
 import numpy as np
 import re
+
+
+TRIBE_WITHDRAW = (930, 110, 180, 60)
+
+
+def is_tribe_formation(s):
+    if not s.find('^部队$',(45,0,230,65)):return False
+    if is_saved_team_list(s) or s.find('^取消$|^确定$|^获得奖励$'):return False
+    if s.find(r'^(?:空闲\s*[12]?|部队[12])$',(890,60,250,70)):return True
+    # Marching/arrival text can overlap the selected troop name. Require the
+    # whole independent-troop layout rather than inventing a dropdown value.
+    return bool(s.find('^可复制配置$',(780,20,190,55)) and
+                s.find('^起源核心$',(1160,220,120,75)) and
+                s.find('^起源基石$',(1160,310,120,75)) and
+                s.find('^撤离$',TRIBE_WITHDRAW))
+
+
+def tribe_troop_deployed(s):
+    return is_tribe_formation(s) and s.find('^撤离$',TRIBE_WITHDRAW) is not None
 
 
 def saved_team_rows(screen):
@@ -59,11 +78,10 @@ def saved_team_copy_target(b,screen,team):
 
 def source_lineup(image,row_y):
     y=int(row_y)
-    if y+110>image.shape[0]:return None
+    if y+89>image.shape[0]:return None
     portraits=[image[y+54:y+89,402+i*80:462+i*80].copy() for i in range(5)]
-    god=image[y+39:y+110,795:963].copy()
-    if any(p.size==0 or p.std()<8 for p in [*portraits,god]):return None
-    return {'portraits':portraits,'god':god}
+    if any(p.size==0 or p.std()<8 for p in portraits):return None
+    return {'portraits':portraits}
 
 
 def copied_lineup(source,image):
@@ -85,22 +103,4 @@ def copied_lineup(source,image):
         b,g,r=(tick[:,:,i] for i in range(3))
         if ((g>115)&(g>r*1.15)&(g>b*1.15)).mean()<.025:continue
         if all(abs(x-old)>65 for old in hits):hits.append(x)
-    god_verified=False
-    if len(hits)==5:
-        sift=cv2.SIFT_create(contrastThreshold=.015)
-        god=cv2.cvtColor(source['god'],cv2.COLOR_BGR2GRAY)
-        scene=cv2.cvtColor(image[70:300,230:510],cv2.COLOR_BGR2GRAY)
-        a,da=sift.detectAndCompute(god,None);b,db=sift.detectAndCompute(scene,None)
-        if da is not None and db is not None and len(db)>=2:
-            pairs=cv2.BFMatcher().knnMatch(da,db,k=2)
-            good=[m for pair in pairs if len(pair)==2 for m,n in [pair]
-                  if m.distance<.7*n.distance and a[m.queryIdx].pt[0]>60]
-            if len(good)>=4:
-                start=np.float32([a[m.queryIdx].pt for m in good])
-                end=np.float32([b[m.trainIdx].pt for m in good])
-                matrix,inliers=cv2.estimateAffinePartial2D(start,end,method=cv2.RANSAC,ransacReprojThreshold=5)
-                if matrix is not None:
-                    scale=float(np.hypot(matrix[0,0],matrix[0,1]))
-                    god_verified=bool(inliers.sum()>=4 and .65<scale<4 and abs(matrix[0,1])<scale*.3)
-    return {'verified':len(hits)==5 and god_verified,'matched_monsters':len(hits),
-            'god_verified':god_verified,'portrait_scores':scores}
+    return {'verified':len(hits)==5,'matched_monsters':len(hits),'portrait_scores':scores}

@@ -251,7 +251,8 @@ def run_puzzle(settings,stop,log=print,emit=lambda *a:None):
             f.write(json.dumps({'time':datetime.now().astimezone().isoformat(),**action},ensure_ascii=False)+'\n')
     def note(message):
         log(message);report['events'].append({'time':datetime.now().isoformat(timespec='seconds'),'message':message})
-    b=Backend(settings,stop,note,lambda message:emit('phase',message),audit);player=PuzzlePlayer(b,report,emit)
+    b=Backend(settings,stop,note,lambda message:emit('phase',message),audit,recover_gold_details=True)
+    player=PuzzlePlayer(b,report,emit)
     try:
         target,games=puzzle_options(settings)
         b.connect();report['reason']=player.play(target,games)

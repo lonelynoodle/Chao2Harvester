@@ -2,7 +2,7 @@
 from copy import deepcopy
 
 from .activities import BudgetReached
-from .policy import TaskBlocked
+from .policy import TaskBlocked,UserStopped,SessionUnavailable
 
 
 class CelebrationActivities:
@@ -12,6 +12,7 @@ class CelebrationActivities:
         self.options={**original,
             'triad':{'auto_settle':options['triad_auto_settle']},
             'giant':{'teams':deepcopy(options['giant_teams']),'max_runs':options['giant_max_runs'],
+                     'wall_mode':options.get('giant_wall_mode','ignore'),
                      'skip_completed':options['giant_skip_completed'],'auto_settle':options['giant_auto_settle']}}
         jobs=[]
         if options['triad']:jobs.append(('triad','三阵入局',self.triad))
@@ -31,14 +32,15 @@ class CelebrationActivities:
                     result=value if isinstance(value,dict) else {
                         'status':'skipped' if '已跳过' in value else 'done','message':value}
                 except BudgetReached as error:result={'status':'skipped','message':str(error)}
-                except TaskBlocked as error:
+                except (UserStopped,SessionUnavailable):raise
+                except Exception as error:
                     result={'status':'blocked','message':str(error)};failures.append(label)
                 finally:
                     for row in self.report.get('team_attempts',[])[start:]:
                         row.update(group='celebration',instance_id=ident)
                     self.task_counts['celebration']=self.task_counts.get('celebration',0)+self.task_counts.get(key,0)-count
                 results[key]=result;self.note(result['message']);self.checkpoint()
-                self.home()
+                self.recover_failed_task() if result.get('status')=='blocked' else self.home()
         finally:
             self.options=original;self.active_task='celebration'
         if failures:raise TaskBlocked('庆典活动部分未完成：'+'、'.join(failures))

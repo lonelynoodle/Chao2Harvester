@@ -115,16 +115,16 @@ def test_combat_does_not_exhaust_dialogue_idle_or_duration_limits(tmp_path,monke
     assert clock[0]>240 and g.row['status']=='completed' and g.row['rewards_closed']==1
 
 
-def test_merchant_battle_uses_configured_timeout_and_restores_original_task(tmp_path,monkeypatch):
+def test_merchant_long_battle_extends_configured_timeout_and_restores_task(tmp_path,monkeypatch):
     import chao2.battle_takeover as takeover
-    g=Event(tmp_path,monkeypatch,ticks=1000);clock=[0]
+    g=Event(tmp_path,monkeypatch,ticks=18);clock=[0]
     monkeypatch.setattr(takeover,'time',SimpleNamespace(monotonic=lambda:clock[0]))
     g.d.b.settings['battle_timeout_seconds']=4
     g.d.b.sleep=lambda seconds:clock.__setitem__(0,clock[0]+seconds)
-    with pytest.raises(TaskBlocked,match='等待结算超时'):g.run()
-    assert clock[0]<15 and g.d.active_task=='main' and g.exits==0
-    assert g.row['status']=='blocked' and g.row['battles'][0]['status']=='blocked'
-    assert g.row['battles'][0]['outcome'] is None and g.d.task_counts=={}
+    g.run()
+    assert clock[0]>4 and g.d.active_task=='main' and g.exits==1
+    assert g.row['status']=='completed' and g.d.report['battle_wait_extensions']
+    assert g.d.task_counts=={}
 
 
 def test_stop_in_combat_propagates_without_extra_input(tmp_path,monkeypatch):

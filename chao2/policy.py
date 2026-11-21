@@ -4,6 +4,15 @@ from dataclasses import dataclass
 class SafetyStop(RuntimeError):
     pass
 
+class SessionUnavailable(SafetyStop):
+    """The device, account or automation connection cannot accept game input."""
+    pass
+
+class NativeOperationTimeout(SessionUnavailable):
+    """Only drained, read-only jobs may be retried after a native timeout."""
+    def __init__(self,message,*,settled=False):
+        super().__init__(message);self.settled=settled
+
 class PageChanged(SafetyStop):
     """The button vanished before input; retain the actual rechecked frame."""
     def __init__(self,pattern,screen=None):
@@ -14,6 +23,21 @@ class UserStopped(RuntimeError):
     pass
 
 class TaskBlocked(RuntimeError):
+    pass
+
+class BattleReturned(RuntimeError):
+    """A battle has returned to a known page without an observed result."""
+    def __init__(self,screen,destination,signature=None,task=None,target=None):
+        super().__init__('已返回'+destination+'，未观察到本场胜败')
+        self.screen=screen;self.destination=destination;self.signature=signature
+        self.task=task;self.target=target
+
+class ResourceReadError(TaskBlocked):
+    """A bounded resource-field read failed; do not replay page navigation."""
+    pass
+
+class IsolatedTaskError(TaskBlocked):
+    """An action failed locally; preserve its journal and continue other tasks."""
     pass
 
 class ChallengeLocked(TaskBlocked):
@@ -45,6 +69,13 @@ def is_stamina_potion_dialog(s):
                 s.find('^使用数量$',(300,345,145,65)) and
                 s.find('^取消$',(420,440,130,65)) and s.find('^确定$',(745,440,130,65)) and
                 not re.search('购买|消耗钻石|充值|重置|极化|补充次数',s.text))
+
+STAMINA_POTION_CONFIRMATION=r'^是否消耗移动力药水回复\s*100\s*移动力[?？]?$'
+
+def is_stamina_potion_confirmation(s):
+    return bool(s.find(STAMINA_POTION_CONFIRMATION,(325,253,625,115)) and
+                s.find('^取消$',(420,455,130,65)) and s.find('^确定$',(745,455,130,65)) and
+                not re.search('购买|钻石|金币|充值|重置|极化|补充次数|使用数量',s.region_text((290,170,705,380))))
 
 def can_claim_stamina(current: int | None, cap: int | None, gain=100) -> bool:
     return current is not None and cap is not None and 0 <= current <= cap and current + gain <= cap

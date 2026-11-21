@@ -64,7 +64,7 @@ def test_legacy_preserve_value_becomes_checkbox(value,enabled,effective):
     assert 'max_runs' not in options
 
 
-def test_celebration_retries_child_navigation_and_does_not_replay_completed_children(tmp_path):
+def test_celebration_skips_failed_child_without_replaying_completed_children(tmp_path):
     d=daily(tmp_path,{'task_options':{'celebration':{'triad':True,'giant':True,'daily_puzzle':False}}})
     d.active_task='celebration';attempts=[];returns=[]
     def triad():
@@ -75,10 +75,11 @@ def test_celebration_retries_child_navigation_and_does_not_replay_completed_chil
     d.triad=triad;d.giant=lambda:pytest.fail('Already completed giant must not replay')
     d.can_recover_page=lambda error:True;d.home=lambda:returns.append('home')
     d.report['celebration_tasks']={'celebration':{'giant':{'status':'done','message':'巨物已完成'}}}
-    summary=d.celebration()
-    assert attempts==['triad','triad'] and '三阵已完成' in summary
-    assert len(d.report['page_recoveries'])==1 and d.task_counts['celebration']==1
-    d.celebration();assert len(attempts)==2
+    with pytest.raises(TaskBlocked):d.celebration()
+    assert attempts==['triad'] and not d.report.get('page_recoveries')
+    assert d.report['celebration_tasks']['celebration']['triad']['status']=='blocked'
+    assert d.report['celebration_tasks']['celebration']['giant']['status']=='done'
+    assert returns==['home']
 
 
 def test_cocoon_retry_state_is_independent_for_each_queue_instance(tmp_path):

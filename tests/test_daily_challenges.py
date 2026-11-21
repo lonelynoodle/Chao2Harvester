@@ -5,7 +5,7 @@ import pytest
 from test_configuration import captured,daily,screen
 from chao2.daily_challenges import origin_is_open,arena_candidates,choose_opponent,arena_quota,origin_quota,rampage_buff
 from chao2.configuration import normalize_settings
-from chao2.policy import TaskBlocked,SafetyStop
+from chao2.policy import TaskBlocked,SafetyStop,IsolatedTaskError
 import chao2.daily_challenges as challenges
 import chao2.workflows as flow
 
@@ -18,14 +18,12 @@ def test_origin_converts_utc_and_rejects_ambiguous_naive_clock():
     assert not origin_is_open(datetime(2026,10,14,14,0,tzinfo=timezone.utc))
     with pytest.raises(ValueError):origin_is_open(datetime(2026,10,14,20,0))
 
-def test_closed_origin_skips_even_without_emulator(tmp_path,monkeypatch):
-    monkeypatch.setattr(flow,'origin_is_open',lambda:False)
-    monkeypatch.setattr(flow,'create_report',lambda:{'folder':tmp_path,'tasks':{},'events':[]})
-    monkeypatch.setattr(flow.Backend,'connect',lambda _:pytest.fail('Closed task must not connect'))
-    result=flow.run_daily({},['origin'],threading.Event(),log=lambda _:None)
-    assert result['status']=='completed' and result['tasks']['origin']['status']=='skipped'
-    assert result['tasks']['origin']['attempts']==0
-    assert result['diamond_spend']==0
+def test_closed_origin_is_skipped_when_its_task_executes(tmp_path,monkeypatch):
+    d=daily(tmp_path);monkeypatch.setattr(challenges,'origin_is_open',lambda:False)
+    d.enter_building=lambda *a:pytest.fail('Closed task must not navigate')
+    d.execute_task('origin')
+    assert d.report['tasks']['origin']['status']=='skipped'
+    assert d.report['tasks']['origin']['attempts']==0
 
 def test_closed_origin_method_never_navigates(tmp_path,monkeypatch):
     d=daily(tmp_path);monkeypatch.setattr(challenges,'origin_is_open',lambda:False)
@@ -177,7 +175,7 @@ def test_unknown_pvp_settlement_times_out_without_recording_success(tmp_path,mon
     monkeypatch.setattr(challenges.time,'monotonic',lambda:clock[0])
     d.observe=lambda:screen(('连接中',400,300,100,30));d.b.guard=lambda s:None
     d.b.sleep=lambda seconds:clock.__setitem__(0,clock[0]+seconds)
-    with pytest.raises(SafetyStop,match='结算'):d.pvp_battle('origin')
+    with pytest.raises(IsolatedTaskError,match='回退后继续下一项'):d.pvp_battle('origin')
     assert not d.report.get('team_attempts')
 
 def test_rank_promotion_is_dismissed_before_counting_victory(tmp_path):
@@ -200,26 +198,116 @@ def test_network_retry_is_bounded_and_never_confirms_an_unrelated_dialog(tmp_pat
     assert clicks==['^确定$']
 
 def test_existing_rampage_score_skips_without_starting_fight(tmp_path):
-    d=daily(tmp_path);s=captured('rampage-menu');d.enter_building=lambda *a:s
-    d.rampage_ready=lambda:s;d.rampage_score=lambda s:550
-    clicks=[];d.b.click_text=lambda s,p:clicks.append(p);d.home=lambda:None
+    d=daily(tmp_path);s=rampage_menu(550);d.enter_building=lambda *a:s
+    d.b.click_text=lambda *a,**k:pytest.fail('Already on the challenge page')
+    d.home=lambda:None
     assert '已有550' in d.nest()
-    assert clicks==['^暴走旷野$']
 
-def test_rampage_completion_requires_positive_client_record(tmp_path):
-    d=daily(tmp_path);s=captured('rampage-menu');d.enter_building=lambda *a:s
-    d.rampage_ready=lambda:s;d.rampage_score=lambda s:0
-    d.b.click_text=lambda *a:None;d.rampage_battle=lambda:s;d.exit_result=lambda *a:None
-    d.start_challenge=lambda *a:None
-    with pytest.raises(TaskBlocked,match='有效成绩'):d.nest()
-    assert 'rampage_score_end' not in d.report
+
+def rampage_menu(score):
+    return screen(('谜之巢穴',124,14,90,24),('暴走旷野',961,82,89,23),
+                  ('最高击破数',1002,412,91,19),('我的排名',1000,382,76,23),
+                  ('挑战',1086,497,66,35),(str(score),1209,412,25,21))
+
+
+def rampage_result(value):
+    return screen(('本场击破数',665,365,113,24),('本场金币奖励',665,411,135,23),
+                  ('退出',1149,582,55,29),(value,1057,365,148,22))
+
+
+def test_rampage_retries_stale_score_until_observing_a_real_settlement(tmp_path):
+    d=daily(tmp_path,{'task_options':{'nest':{'teams':[2],'repeat_challenge':True}}})
+    ready=rampage_menu(550);done=rampage_result('467');launches=[];copies=[];exits=[]
+    d.enter_building=lambda *a:ready
+    d.apply_saved_team=lambda s,team:copies.append(team) or s
+    d.start_challenge=lambda task,s,resource:launches.append(s)
+    d.exit_result=lambda s:exits.append(s) or ready
+    rounds=iter([ready,done]);d.battle_frames=lambda *a,**k:iter([next(rounds)])
+    d.battle_return_page=lambda *a:True
+    d.home=lambda:None
+    assert '已完成1场' in d.nest()
+    assert launches==[ready,ready] and copies==[2] and exits==[done]
+    assert len(d.report['team_attempts'])==1 and d.report['team_attempts'][0]['kills']==467
+
+
+def test_rampage_cross_day_restarts_from_current_lobby_and_records_new_day(tmp_path,monkeypatch):
+    class Clock:
+        @staticmethod
+        def now(tz):return datetime(2026,11,21,0,9,tzinfo=tz)
+
+    monkeypatch.setattr(challenges,'datetime',Clock)
+    d=daily(tmp_path,{'task_options':{'nest':{'repeat_challenge':True}}})
+    d.date='2026-11-20';d.day=d.state.setdefault(d.date,{})
+    before=rampage_menu(1304);next_day=rampage_menu(0);after=rampage_menu(620)
+    invalid=rampage_result('无法跨天结算');valid=rampage_result('新纪录620')
+    d.enter_building=lambda *a:before
+    launches=[];d.start_challenge=lambda task,s,resource:launches.append(s)
+    rounds=iter([invalid,valid]);d.battle_frames=lambda *a,**k:iter([next(rounds)])
+    def leave(s):
+        if s is invalid:assert d.report['rampage_settlement']['status']=='cross_day'
+        return next_day if s is invalid else after
+    d.exit_result=leave;d.home=lambda:None
+    assert '已完成1场，今日最高击破620' in d.nest()
+    assert launches==[before,next_day] and d.task_counts['nest']==2
+    assert not d.day.get('rampage_done') and d.state['2026-11-21']['rampage_done']
+    assert any('无法跨天结算，补打' in event['message'] for event in d.report['events'])
+
+
+@pytest.mark.parametrize('returns_to_territory',[False,True])
+def test_gift_interrupting_nest_entry_keeps_the_mode_step(tmp_path,monkeypatch,returns_to_territory):
+    from chao2.policy import PageChanged
+
+    d=daily(tmp_path);d.active_task='nest';menu=rampage_menu(0)
+    selector=screen(('谜之巢穴',124,14,90,24),('暴走旷野',592,620,98,40))
+    gift=screen(('限时星礼',110,15,126,40),('三色孢子星礼',175,300,140,36),('核心延能星礼',495,300,140,36))
+    territory=screen(('世界',1193,677,75,26),('永生之茧',858,209,107,26))
+    state=[selector];clicks=[];reopened=[];clock=[0]
+    monkeypatch.setattr('chao2.navigation_retry.time.monotonic',lambda:clock[0])
+    d.b.guard=lambda s:None;d.b.sleep=lambda seconds:clock.__setitem__(0,clock[0]+seconds)
+    d.observe=lambda:state[0];d.b.observe=lambda:state[0]
+    d.home=lambda:pytest.fail('Resume in the nest selector')
+    def enter(*args,source):
+        assert source is territory
+        reopened.append(source);state[0]=selector
+        return selector
+    d.enter_building=enter
+    def choose(s,p,**kwargs):
+        assert s is selector
+        clicks.append(p)
+        if clicks.count(p)==1:raise PageChanged(p,gift)
+        state[0]=menu
+    d.b.click_text=choose
+    def close(*a):
+        clicks.append('关闭礼包');state[0]=territory if returns_to_territory else selector
+    d.b.click_at=close
+    assert d.rampage_ready(selector) is menu
+    assert clicks==['^暴走旷野$','关闭礼包','^暴走旷野$']
+    assert len(reopened)==int(returns_to_territory)
+    assert d.report['dismissed_offers'][0]['task']=='nest'
+
+def test_rampage_gift_returning_to_buff_continues_same_battle(tmp_path):
+    d=daily(tmp_path);d.active_task='nest'
+    gift=screen(('限时星礼',110,15,126,40),('三色孢子星礼',175,300,140,36),('核心延能星礼',495,300,140,36))
+    buff=screen(('请选择一个暴走增益',450,120,360,36))
+    done=rampage_result('620');current=[gift];events=[]
+    d.b.observe=lambda *a:current[0]
+    def close(s,p,anchors,reason):
+        assert s is gift and p==(43,28)
+        events.append('gift');current[0]=buff
+    def choose(s):
+        assert s is buff
+        events.append('buff');current[0]=done
+    d.b.click_at=close;d.choose_rampage_buff=choose
+    assert d.rampage_battle() is done
+    assert events==['gift','buff'] and d.task_counts['nest']==1
+
 
 def test_rampage_settled_once_records_daily_and_preserves_current_team(tmp_path):
-    d=daily(tmp_path);s=captured('rampage-menu');d.enter_building=lambda *a:s
-    d.rampage_ready=lambda:s;scores=iter([0,620]);d.rampage_score=lambda s:next(scores)
-    d.b.click_text=lambda *a:None;d.rampage_battle=lambda:s;d.exit_result=lambda *a:None
+    d=daily(tmp_path);s=rampage_menu(0);d.enter_building=lambda *a:s
+    after=rampage_menu(620);d.rampage_battle=lambda:after
+    d.exit_result=lambda *a:pytest.fail('The result was already closed')
     d.start_challenge=lambda *a:None
     d.apply_saved_team=lambda *a:pytest.fail('Keep existing formation and ally by default')
     d.home=lambda:None
     assert '620' in d.nest()
-    assert d.day['rampage_done'] and len(d.report['team_attempts'])==1
+    assert len(d.report['team_attempts'])==1

@@ -1,6 +1,7 @@
 """Single-attempt hunt flow and migration; no device input."""
 from copy import deepcopy
 
+import cv2
 import pytest
 
 from chao2.activities import BudgetReached
@@ -138,3 +139,73 @@ def test_hunt_does_not_probe_or_claim_when_stamina_is_sufficient(tmp_path,balanc
     d.stamina_offer=lambda:pytest.fail('Enough stamina: must not open free offer')
     d.replenish_stamina()
     assert d.report['stamina_refill']['claimed']==0
+
+
+def hunter_detail(name='未知'):
+    return screen((name,134,135,58,30),('08:04',605,138,68,22),
+                  ('敌方阵容',1132,136,102,26),('排阵',822,614,62,34),
+                  ('前往挑战',1034,604,112,32),('10',1097,639,25,16))
+
+
+def hunter_loading(detail):
+    waiting=deepcopy(detail)
+    for center,radius in [((595,330),9),((622,310),11),((655,311),13)]:
+        cv2.circle(waiting.image,center,radius,(255,255,255),-1)
+    return waiting
+
+
+def test_hunt_detail_waits_while_buttons_are_visible_under_loading(tmp_path):
+    d=daily(tmp_path);d.active_task='hunt'
+    detail=hunter_detail()
+    frames=iter([hunter_loading(detail),detail])
+    d.observe=lambda:next(frames)
+    d.b.sleep=lambda _:None
+    assert d.await_detail() is detail
+
+
+@pytest.mark.parametrize('state',['already_open','fast','spinner','blank','other_hunter','same_hunter'])
+def test_hunt_formation_uses_current_frames_for_wait_or_retry(tmp_path,state):
+    d=daily(tmp_path);d.active_task='hunt'
+    detail=hunter_detail()
+    formation=screen(('排阵',125,15,65,30),('狩猎',930,82,80,25))
+    frames=iter({
+        'already_open':[formation],
+        'fast':[detail,formation],
+        'spinner':[detail,detail,hunter_loading(detail),detail,formation],
+        'blank':[detail,detail,screen(),detail,formation],
+        'other_hunter':[detail,detail,hunter_detail('另一只'),detail,formation],
+        'same_hunter':[detail,detail,detail,formation],
+    }[state])
+    d.observe=lambda:next(frames)
+    clicks=[];selected=[];sleeps=[]
+    d.b.sleep=sleeps.append
+    d.b.click_at=lambda s,p,_,reason,**kwargs:clicks.append((s,p,reason,kwargs))
+    d.b.click_text=lambda *a,**k:pytest.fail('Hunt recheck must inspect the whole layout')
+    def select(s,team):
+        assert s is formation
+        selected.append(team)
+        return s
+    d.apply_saved_team=select
+    assert d.select_team(detail,1,return_page=lambda:detail) is detail
+    expects={
+        'already_open':[],
+        'same_hunter':[(853,631),(849,631)],
+    }.get(state,[(853,631)])
+    assert clicks==[(detail,p,'打开狩猎排阵',{'settle_delay':0}) for p in expects]+[
+        (formation,(45,28),'返回关卡',{})]
+    assert sleeps==([.25] if state in ('spinner','blank','other_hunter') else [])
+    assert len(d.report.get('navigation_retries',[]))==int(state=='same_hunter')
+    assert selected==[1] and d.battles==0 and not d.search_counts
+
+
+def test_hunt_formation_stops_after_three_confirmed_retries(tmp_path):
+    d=daily(tmp_path);d.active_task='hunt'
+    detail=hunter_detail()
+    d.observe=lambda:detail
+    d.b.sleep=lambda _:pytest.fail('Confirmed detail needs a fresh read, with no fixed wait')
+    clicks=[]
+    d.b.click_at=lambda _,point,*args,**kwargs:clicks.append(point)
+    with pytest.raises(TaskBlocked,match='补点3次后仍在原猎物详情'):
+        d.open_detail_formation(detail)
+    assert clicks==[(853,631),(849,631),(857,631),(853,627)]
+    assert len(d.report['navigation_retries'])==3

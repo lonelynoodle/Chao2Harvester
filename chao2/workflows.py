@@ -11,13 +11,18 @@ import time
 from datetime import datetime
 from pathlib import Path
 from .backend import Backend, Screen, Word, ROOT
-from .policy import SafetyStop, PageChanged, UserStopped, TaskBlocked, FightLost, EncounterInterrupted, parse_ratio, can_claim_stamina, friend_allowed
+from .network_recovery import NetworkRecovery
+from .battle_wait import BattleWait
+from .task_recovery import TaskRecovery
+from .policy import SessionUnavailable
+from .policy import SafetyStop, PageChanged, UserStopped, TaskBlocked, FightLost, EncounterInterrupted, BattleReturned, IsolatedTaskError, parse_ratio, can_claim_stamina, friend_allowed
 from .configuration import normalize_settings,normalize_selected,plan_tasks,STAMINA_TASKS,SPECS,team_order,selected_rows,limit_reached,run_team_plan,COCOON_CARDS
 from .activities import ConfiguredActivities,BudgetReached,is_exploration_rewards,is_tribe_detail,is_tribe_map,is_giant_ready,is_main_detail,enemy_formation,recover_main_detail
 from .daily_challenges import DailyChallenges,origin_is_open,pvp_result,pvp_settle_button,origin_resume_state,rank_change_notice
 from .report_history import prune_reports,reserve_report
 from .overview import OverviewNavigation,OVERVIEW_ROUTES,overview_matches
-from .other_tasks import OtherTasks,is_friend_profile,friend_delete_confirmation
+from .other_tasks import OtherTasks,is_bag,is_friend_profile,friend_delete_confirmation
+from .daily_upgrades import core_upgrade_dialog
 from .activity_rewards import ActivityRewards
 from .trigger_events import TriggerEvents,rift_invitation,triggered_event
 from .task_reporting import TaskReporting,PRIMARY_RESOURCES
@@ -40,6 +45,8 @@ from .battle_takeover import BattleTakeover,takeover_phase
 from .celebration import CelebrationActivities
 from .tribe_rewards import TribeOccupationRewards
 from .tribe_chests import TribeChestRewards
+from .tribe_notifications import TribeNotifications,donation_rewards_page
+from .copy_rewards import CopyRewards
 from .page_recovery import PageRecovery,exit_game_dialog
 from .challenge_start import ChallengeStartRecovery
 from .result_navigation import ResultNavigation
@@ -47,22 +54,23 @@ from .team_copy import is_saved_team_list,saved_team_anchors
 from .team_switch import suppression_team_switch_dialog
 from .file_io import atomic_json
 from .piggy_bank import PiggyBank
-from .plane_gate import plane_gate_window
+from .plane_gate import plane_gate_window,recover_plane_gate_labels
+from .battle_wall import BattleWall
 
 TASKS = {
     'startup':('开始唤醒','点击进入游戏；已有战斗先等结算，再继续所选任务'),
     'exploration':('探索','全部领取并开始探索，必要时一键指派怪兽'),
-    'copies':('异象','复制体挑战与游荡智者答题领奖，可分别开启'),
+    'copies':('异象','领取被他人击破的复制体宝箱，再挑战复制体；游荡智者可分别开启'),
     'hunt':('狩猎','搜索前备足整批30体力，按设置先领三发或使用药水；限时猎物连续挑战完毕'),
-    'main':('主线关卡','按阵容顺序闯关；全部失败后换关卡'),
+    'main':('主线关卡','记录每关已尝试队伍；再次遇到旧关卡时换队'),
     'tower':('浮空巨塔','连续挑战下一关；当前塔层失败后先挑战该塔秘庭，再前往下一座塔。羽毛由所有塔共用'),
     'cocoon':('永生之茧','按添加的副本、优先级及次数挑战'),
-    'tribe':('部落冒险','优先冒险关卡，可在无关卡时随机挑战图腾，保留指定战令'),
+    'tribe':('部落冒险','清理拍卖所和动态通知，领取累计捐献奖励与通关宝箱，再按设置挑战'),
     'rift':('凿星裂痕','优先最高关，打不了回退前一关；胜利后使用库存钥匙开箱'),
     'forest':('黑暗森林','探索当前森林并挑战已开放怪兽，计时或点数用尽仍处理免费挑战，不重置'),
     'origin':('起源殿','北京时间20:00–22:00使用所选队伍，消耗免费挑战次数'),
     'arena':('斗技场','按所选战力策略寻敌，最多刷新3次后选当前低于己方的最高战力对手，消耗免费次数'),
-    'nest':('谜之巢穴','当天尚未挑战时完成一次暴走旷野'),
+    'nest':('谜之巢穴','挑战暴走旷野；勾选重复挑战后，已有成绩也再打一轮'),
     'giant':('进击巨物','开放时按所选阵容分别挑战并核对伤害结算'),
     'triad':('三阵入局','丰野间消耗当日免费匹配次数，每场最多三回合，可自动点击结算'),
     'celebration':('庆典活动','丰野间的三阵入局、进击巨物及拼二每日；未开放的活动自动跳过'),
@@ -85,6 +93,7 @@ def world_anchors(s):
     return [w for pattern,roi in WORLD_ANCHORS if (w:=s.find(pattern,roi))]
 
 def world_overlay_present(s):
+    from .story_cards import story_echo_upgrade
     if suppression_team_switch_dialog(s):return True
     if exit_game_dialog(s):return True
     if plane_gate_window(s):return True
@@ -94,7 +103,7 @@ def world_overlay_present(s):
     if enemy_formation(s):return True
     if rank_change_notice(s):return True
     if is_map_story(s) or echo_story_kind(s):return True
-    if is_level_up(s):return True
+    if is_level_up(s) or story_echo_upgrade(s):return True
     if is_wild_offer(s) or is_wild_capture(s):return True
     if ambush_identity(s) or is_map_choice(s) or merchant_title(s):return True
     if is_exploration_rewards(s):return True
@@ -136,9 +145,10 @@ def is_failure(s):
                 (s.has('^狩猎积分$','^元核升级$','^阵容调整$') and not s.find('获得奖励'))))
 
 from .star_shop import StarShop
+from .blue_evolution import BlueEvolution
 from .tribe_totems import totem_score
 
-class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,NavigationRecovery,PageRecovery,BattleTakeover,ChallengeStartRecovery,ResultNavigation,EventHubNavigation,OverviewNavigation,ConfiguredActivities,AnomalyActivities,DailyChallenges,TriadActivities,CelebrationActivities,TribeOccupationRewards,TribeChestRewards,OtherTasks,StarShop,ActivityRewards,MonsterBoxInventory,RewardCollection,TaskReporting,WorldEvents,RiftActivity,ForestActivity,StaminaInventory,WildCapture,FreeSummon):
+class Daily(BattleWait,TaskRecovery,BattleWall,NetworkRecovery,PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,NavigationRecovery,PageRecovery,BattleTakeover,ChallengeStartRecovery,ResultNavigation,EventHubNavigation,OverviewNavigation,ConfiguredActivities,AnomalyActivities,DailyChallenges,TriadActivities,CelebrationActivities,TribeOccupationRewards,TribeChestRewards,TribeNotifications,CopyRewards,OtherTasks,BlueEvolution,StarShop,ActivityRewards,MonsterBoxInventory,RewardCollection,TaskReporting,WorldEvents,RiftActivity,ForestActivity,StaminaInventory,WildCapture,FreeSummon):
     def __init__(self,b:Backend,report,emit=lambda *a:None):
         self.b=b;self.report=report;self.emit=emit
         b.settings=normalize_settings(b.settings)
@@ -161,12 +171,39 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
     def checkpoint(self):
         if self.report.get('folder'):write_report(self.report)
     def observe(self,name=None,*,dismiss_popups=True):
-        if time.monotonic()-self.start_time>int(self.b.settings.get('max_run_minutes',90))*60:raise SafetyStop('已达到本轮运行时长上限')
+        if (not getattr(self,'_run_time_noted',False) and
+                time.monotonic()-self.start_time>int(self.b.settings.get('max_run_minutes',90))*60):
+            self._run_time_noted=True
+            self.note('本轮运行已超过原时长阈值，按当前页面状态继续战斗和后续任务')
         path=self.report['folder']/((name or 'latest')+'.png')
-        original=self.b.observe(path);s=self.dismiss_level_up(original) if dismiss_popups else original
+        original=self.b.observe(path)
+        if getattr(self,'_recovering_task',False):
+            s=self.cancel_failed_task_dialog(original)
+        else:s=self.recover_network_dialog(original) if dismiss_popups else original
+        if dismiss_popups:s=self.dismiss_level_up(s)
+        if dismiss_popups:
+            from .story_cards import story_echo_upgrade,close_story_echo_upgrade
+            if story_echo_upgrade(s):
+                upgrades=self.report.setdefault('resumed_echo_upgrades',[])
+                self.b.save_screen(s,self.report['folder']/f'echo-upgrade-resume-{len(upgrades)+1}.png')
+                upgrades.append(s.text);self.checkpoint()
+                self.note('关闭当前回响等级提升提示，继续原任务')
+                s=close_story_echo_upgrade(self.b,s)
         if dismiss_popups:s=self.dismiss_triggered_popups(s)
+        s=recover_plane_gate_labels(self.b,s)
         s=self.calibrate_collection_reward(s)
+        from .piggy_bank import recover_piggy_storage
+        s=recover_piggy_storage(self.b,s)
         s=self.recover_world_navigation(s)
+        from .territory_labels import recover_territory_labels
+        s=recover_territory_labels(self.b,s)
+        from .activities import recover_tower_detail
+        s=recover_tower_detail(self.b,s)
+        from .dungeon_labels import recover_totem_heading,recover_timed_encounter_heading,recover_cocoon_heading,recover_forest_heading
+        s=recover_totem_heading(self.b,s)
+        s=recover_timed_encounter_heading(self.b,s)
+        s=recover_cocoon_heading(self.b,s)
+        s=recover_forest_heading(self.b,s)
         s=recover_main_detail(self.b,s)
         s=recover_rift_detail(self.b,s)
         tribe_visible=is_tribe_map(s)
@@ -252,9 +289,11 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
         from .abyss import is_abyss_menu,is_abyss_affixes,AFFIX_ANCHORS
         unknown=0
         back_steps=0
+        bag_back_attempts=0
         switch_cancel_attempts=0
         for _ in range(64):
             s=screen if screen is not None else self.observe();screen=None
+            s=self.wait_for_scene_loading(s)
             s=self.dismiss_level_up(s)
             s=self.dismiss_triggered_popups(s)
             s=self.recover_world_navigation(s);self.b.guard(s)
@@ -267,7 +306,11 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
             if exit_game_dialog(s):
                 self.b.click_at(s,s.find('^再玩一会$').center,['^是否确认退出游戏$','^再玩一会$'],'取消退出游戏，继续返回')
                 continue
-            if takeover_phase(s):
+            phase=takeover_phase(s)
+            if phase=='matching' and getattr(self,'_recovering_task',False):
+                cancel=s.find('^取消匹配$',(300,420,700,240))
+                self.b.click_at(s,cancel.center,['^取消匹配$'],'取消未完成的匹配，返回后继续下一项');continue
+            if phase:
                 screen=self.finish_existing_battle(s);continue
             pending=self.day.get('star_evolution_pending')
             if pending:
@@ -282,16 +325,30 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                 self.note('检测到遗留的'+receipt+'获得展示，关闭后继续核对当前任务；不重复开茧')
                 screen=self.close_monster_box_result(s,receipt,return_to_bag=False);continue
             from .star_shop import donation_page
+            if donation_rewards_page(s):
+                screen=self.close_donation_rewards(s);continue
             if donation_page(s):
                 self.b.click_at(s,(43,28),['^支配核心$'],'退出支配核心');continue
             if rank_change_notice(s):
                 screen=self.dismiss_rank_change(s);continue
             if is_merchant(s):
+                if getattr(self,'_recovering_task',False):
+                    from .merchant import merchant_action
+                    action=merchant_action(self.b,s,mode='skip')
+                    if action:
+                        _,point,anchors,reason=action
+                        self.b.click_at(s,point,anchors,'回退任务：'+reason)
+                    else:self.b.back(s,'退出未完成任务中的神秘商人')
+                    continue
                 screen=self.handle_merchant(s);continue
             if is_ambush(s):
+                if getattr(self,'_recovering_task',False):
+                    self.b.back(s,'退出未完成任务中的敌袭详情');continue
                 self.handle_ambush(s);continue
             if plane_gate_window(s):
                 screen=self.close_plane_gate(s);continue
+            if s.has('^战墙$','^切换$','^加固$'):
+                self.b.click_at(s,(43,28),['^战墙$','^切换$'],'退出战墙配置，保留当前类型');continue
             if is_map_choice(s):
                 screen=self.close_map_choice(s);continue
             if is_summon_page(s):
@@ -318,6 +375,8 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
             if is_sage_offer(s):
                 self.b.click_at(s,(928,130),['^游荡智者$','^前往$'],'关闭游荡智者介绍');continue
             if is_sage_dialog(s) and not s.find('^获得奖励$'):
+                if getattr(self,'_recovering_task',False):
+                    self.b.back(s,'退出未完成任务中的游荡智者');continue
                 screen=self.resume_sage_dialog(s)
                 if screen is not None:continue
                 raise TaskBlocked('游荡智者答题尚未结束，保留题目与选项，请完成后继续')
@@ -331,10 +390,15 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                 self.b.click_at(s,(640,660),['^获得奖励$','点击空白位置关闭'],'关闭免费奖励弹层');continue
             if is_world(s):
                 return self.maybe_capture_wild(s) if getattr(self,'wild_daily_active',False) else s
+            if is_bag(s):
+                if bag_back_attempts>=3:raise TaskBlocked('背包返回箭头点击3次后页面仍未变化')
+                self.b.click_at(s,(43,28),['^背包$','^全部$','^元核$'],'退出背包')
+                bag_back_attempts+=1;continue
+            bag_back_attempts=0
             if s.has('主要获得途径','已拥有'):
                 self.b.click_at(s,(640,650),['主要获得途径','已拥有'],'关闭资源说明');continue
             if is_saved_team_list(s):
-                self.b.click_at(s,(960,54),saved_team_anchors(s),'关闭复制配置');continue
+                screen=self.close_saved_team_list(s);continue
             formation=s.find('^排阵$|^部队$',roi=(45,0,230,65))
             if formation:
                 self.b.click_at(s,(45,28),['^'+formation.text+'$'],'退出排阵');continue
@@ -380,14 +444,23 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                 self.b.click_at(s,(640,680),['选择挑战的塔'],'关闭塔选择');continue
             if s.has('^怪兽数量$','^品质$'):
                 self.b.click_at(s,(1228,106),['^怪兽数量$','^品质$'],'关闭怪兽列表');continue
+            from .quick_evolution import quick_source_picker,quick_detail,quick_list,tree_map
+            if quick_source_picker(s):
+                self.b.click_at(s,(1238,72),['^品质$',r'^[xX×]$'],'关闭便捷进化的素材选择');continue
+            if quick_detail(s):
+                self.b.click_at(s,(1101,43),['^详细信息$'],'关闭进化树预览');continue
+            if quick_list(s) or tree_map(s):
+                self.b.click_at(s,(44,28),['^进化树$'],'退出当前进化树页面');continue
+            if core_upgrade_dialog(s):
+                self.b.click_at(s,(1189,82),['^元核强化$','^元核属性$'],'关闭元核强化');continue
             monster_header=s.find('^怪兽信息$|^进化$',roi=(90,0,230,60))
             if monster_header:
                 self.b.click_at(s,(43,28),['^'+re.escape(monster_header.text)+'$'],
                                 '返回怪兽信息上级');continue
-            if is_tribe_map(s):s=self.claim_tribe_occupation(s)
+            if is_tribe_map(s) and not getattr(self,'_recovering_task',False):s=self.claim_tribe_occupation(s)
             if s.find('^世界$',roi=(1150,620,130,100)) and s.find('永生|浮空|黑暗|斗技|领地'):
                 self.b.click_text(s,'^世界$');continue
-            header=s.find('^浮空巨塔$|^永生之茧$|^每日三发$|^活动$|^异象$|^狩猎$|^世界回响$|^世界丰碑$|^遗落回响$|^超星洪流$|^微光笔记$|^宝藏$|^部落冒险$|^部落$|^联结共鸣$|^[谜迷]之巢穴$|^斗技场(?:挑战)?$|^起源殿$|^好友$|^社交$|^背包$|^饲星坛$|^商店$',roi=(80,0,450,70))
+            header=s.find('^浮空巨塔$|^永生之茧$|^每日三发$|^活动$|^异象$|^狩猎$|^世界回响$|^世界丰碑$|^遗落回响$|^超星洪流$|^微光笔记$|^宝藏$|^部落冒险$|^部落$|^拍卖所$|^部落动态$|^联结共鸣$|^[谜迷]之巢穴$|^斗技场(?:挑战)?$|^起源殿$|^好友$|^社交$|^背包$|^饲星坛$|^商店$',roi=(80,0,450,70))
             if header:
                 # Registered non-combat subpages all share the top-left back button.
                 anchor=header.text
@@ -518,28 +591,39 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
             'victories':sum(a.get('outcome')=='victory' for a in self.task_attempts(task))}
         self.checkpoint()
         recovery_error=None
+        returned_counts={}
+        def run_current():
+            while True:
+                try:return self.with_page_recovery(getattr(self,task),name)
+                except BattleReturned as returned:
+                    self.report.setdefault('team_attempts',[]).append({'task':returned.task or task,'team':None,
+                        'outcome':'unobserved','target':returned.target})
+                    key=returned.signature
+                    returned_counts[key]=returned_counts.get(key,0)+1
+                    self._overview_ready=None;self._challenge_entry=None
+                    self.home(returned.screen)
+                    if returned_counts[key]>=3:
+                        raise IsolatedTaskError('连续3次返回同一页面且未确认资源或目标推进，本项跳过，继续后续任务')
+                    self.note(name+'重新读取当前资源与目标，有资源继续，没有则结束本项')
         try:
-            for interruption in range(3):
-                try:result=self.with_page_recovery(getattr(self,task),name);break
-                except EncounterInterrupted:
-                    self.note('寻路事件处理完成，继续定位'+TASKS[task][0])
-                    self.home()
-            else:raise TaskBlocked('该玩法连续被寻路事件打断，事件已处理但原任务未完成')
-            outcome={'status':'done','message':result}
+            result=run_current()
+            outcome={'status':'skipped' if task=='origin' and result.startswith('已跳过起源殿：') else 'done','message':result}
         except BudgetReached as e:
             outcome={'status':'done','message':str(e)}
             if task in STAMINA_TASKS:self.stamina_retry[task]='体力不足' in str(e)
-            try:self.home()
-            except TaskBlocked as error:recovery_error=error
-        except TaskBlocked as e:
+            try:self.recover_failed_task()
+            except (UserStopped,SessionUnavailable):raise
+            except Exception as error:recovery_error=error
+        except (UserStopped,SessionUnavailable):raise
+        except Exception as e:
             outcome={'status':'blocked','message':str(e)}
             if hasattr(self,'last_screen'):
                 checkpoint=self.report['folder']/(report_key+'-blocked.png')
                 self.b.save_screen(self.last_screen,checkpoint)
                 outcome['screenshot']=str(checkpoint)
-            if task!='startup':
-                try:self.home()
-                except TaskBlocked as error:recovery_error=error
+            try:self.recover_failed_task()
+            except (UserStopped,SessionUnavailable):raise
+            except Exception as error:recovery_error=error
         self._overview_ready=None
         if recovery_error:
             outcome['status']='blocked';outcome['recovery_error']=str(recovery_error)
@@ -553,22 +637,26 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
         if entry:
             outcome.update(task=task,name=name,options=entry['options'],resource_usage=self.report.get('resource_usage',{}).get(task,{}).copy())
         self.report.setdefault('tasks',{})[report_key]=outcome
-        self.emit('task',(report_key,'完成' if outcome['status']=='done' else '待校准'))
+        self.emit('task',(report_key,{'done':'完成','skipped':'跳过'}.get(outcome['status'],'待校准')))
         self.note(outcome['message'])
+        if outcome['status']=='blocked' and task!='startup' and not recovery_error:
+            self.note(name+'本次未完成，已返回可识别页面，继续下一项任务')
         write_report(self.report)
         if recovery_error:raise SafetyStop(str(recovery_error))
-        if task=='startup' and outcome['status']=='blocked':raise SafetyStop(outcome['message'])
     def battle(self,resource_name,cost=1):
         if self.battles>=self.limit:raise TaskBlocked('达到单轮战斗上限')
         self.battles+=1
         if self.active_task:self.task_counts[self.active_task]=self.task_counts.get(self.active_task,0)+1
-        until=time.monotonic()+int(self.b.settings.get('battle_timeout_seconds',240))
-        saw_battle=False;last_feedback=time.monotonic();settle_clicked=False
+        saw_battle=False;last_feedback=time.monotonic();settle_clicked=False;returned={'started':time.monotonic()}
+        auto_state=None
+        if self.active_task=='main':
+            auto_state={'clicks':0,'status':'pending' if self.options['main']['auto_deity'] else 'disabled'}
+            self.report.setdefault('main_auto_deity',[]).append(auto_state)
         label=PRIMARY_RESOURCES.get(self.active_task,('',0))[0]
         before=self.report.get('resource_usage',{}).get(self.active_task,{}).get(label,{}).get('remaining')
         if '免费' in resource_name:before=None
-        while time.monotonic()<until:
-            s=self.observe_battle();self.b.guard(s)
+        for s in self.battle_frames(int(self.b.settings.get('battle_timeout_seconds',240)),resource_name,clock=time.monotonic):
+            self.b.guard(s)
             if triggered_event(s) in ('merchant','sage_quiz') or (is_ambush(s) and self.active_task!='ambush'):
                 if not saw_battle:
                     # The requested fight has not started. Do not count the
@@ -578,7 +666,7 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                 if is_merchant(s):self.handle_merchant(s)
                 elif is_sage_dialog(s):self.resume_sage_dialog(s)
                 else:self.handle_ambush(s)
-                if saw_battle:raise SafetyStop('乱入已处理，但原战斗结算未核实，未计为通关')
+                if saw_battle:raise IsolatedTaskError('乱入已处理，但原战斗结算未核实，未计为通关')
                 raise EncounterInterrupted('寻路事件已处理，重新核对原目标')
             if self.active_task=='tribe':
                 if s.has('点击空白位置继续','防御值') or totem_score(s):
@@ -586,7 +674,8 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                     anchors=['点击空白位置继续','我方状态','比拼方式'] if totem_score(s) else ['点击空白位置继续','防御值']
                     self.b.click_at(s,(930,594),anchors,'查看部落冒险结算奖励')
                     continue
-                if s.has('^退出$','获得奖励','重复挑战'):
+                from .tribe_totems import tribe_result
+                if tribe_result(s):
                     result=self.tribe_settlement(s)
                     self.settle_battle_resource(self.active_task,result,'score',before)
                     self.report.setdefault('battles',[]).append({'resource':resource_name,'result':'score','texts':result.text})
@@ -603,6 +692,13 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                 self.report.setdefault('battles',[]).append({'resource':resource_name,'result':'victory','texts':s.text})
                 return s
             if s.find('^暂停$|^自动$|^手动$|^X2$|^x2$|^撤退$'):saw_battle=True
+            page=self.battle_return_page(s,returned,ready=saw_battle or settle_clicked)
+            if page:
+                self.settle_battle_resource(self.active_task,s,'unobserved',before)
+                self.report.setdefault('battles',[]).append({'resource':resource_name,'result':'unobserved','texts':s.text})
+                self.raise_battle_returned(s,page,before)
+            if auto_state is not None and self.enable_battle_auto_deity('main',s,auto_state):
+                self.b.sleep(.4);continue
             if self.active_task=='hunt' and self.options['hunt']['auto_settle'] and not settle_clicked:
                 button=pvp_settle_button(s,self.b.read_text_crop)
                 if button:
@@ -615,7 +711,6 @@ class Daily(PiggyBank,TriggerEvents,TransientPopups,TaskQueueExecution,Navigatio
                 last_feedback=time.monotonic()
             # Loading and victory animation can have no text. Never click them.
             self.b.sleep(2)
-        raise SafetyStop(f'{resource_name}战斗未在时限内结算；停止并保留游戏现场')
 
 def create_report():
     root=Path(os.environ.get('CHAO2_REPORT_ROOT',str(ROOT/'reports')));root.mkdir(parents=True,exist_ok=True)
@@ -638,7 +733,8 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
         action={'time':datetime.now().astimezone().isoformat(),**action}
         with (report['folder']/'actions.jsonl').open('a',encoding='utf-8') as stream:
             stream.write(json.dumps(action,ensure_ascii=False)+'\n')
-    b=Backend(settings,stop,log,progress=lambda message:emit('phase',message),audit=audit);daily=Daily(b,report,emit)
+    b=Backend(settings,stop,log,progress=lambda message:emit('phase',message),audit=audit,
+              recover_gold_details=not diagnostic);daily=Daily(b,report,emit)
     if report.get('history_cleanup_errors'):log('部分旧运行记录暂时无法清理：'+'；'.join(report['history_cleanup_errors']))
     daily.selected=list(selected)
     entries=execution_entries(settings,selected,ORDER)
@@ -650,16 +746,6 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
     report['attempt_counts']=daily.task_counts
     try:
         execution=list(entries)
-        if not diagnostic and any(row['key']=='origin' for row in execution) and not origin_is_open():
-            message='已跳过起源殿：当前不在北京时间20:00–22:00'
-            for row in execution:
-                if row['key']!='origin':continue
-                report['tasks'][row['id']]={'status':'skipped','message':message,'attempts':0,'victories':0}
-                daily.note(message);emit('task',(row['id'],'跳过'))
-            execution=[row for row in execution if row['key']!='origin']
-            if not execution:
-                report['status']='completed';report['diamond_spend']=0
-                return report
         b.connect()
         if diagnostic:
             s=daily.observe('diagnostic',dismiss_popups=False);report['screen_text']=s.text
@@ -671,14 +757,22 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
         # Wake before any routine tries to navigate home or read account resources.
         for entry in execution:
             if entry['key']=='startup':daily.execute_entry(entry)
-        s=daily.home();report['resources_start']=daily.world_resources(s)
+        s=daily.optional_step('开始前返回',daily.home);report['resources_start']=daily.read_run_resources(s,'开始资源读取')
         daily.wild_daily_active=True
-        s=daily.maybe_capture_wild(s)
-        s=daily.maybe_free_summon(s)
+        s=daily.optional_step('开始前捕捉检查',lambda:daily.maybe_capture_wild(s))
+        s=daily.optional_step('开始前免费造唤',lambda:daily.maybe_free_summon(s))
         pending=[row for row in execution if row['key'] not in ('startup','finish')]
         stamina_remaining={row['id'] for row in pending if row['key'] in STAMINA_TASKS}
         while pending:
-            task=daily.next_daily_task(list(dict.fromkeys(row['key'] for row in pending)))
+            try:task=daily.next_daily_task(list(dict.fromkeys(row['key'] for row in pending)))
+            except (UserStopped,SessionUnavailable):raise
+            except Exception as error:
+                daily.note('玩法概览排序未完成（'+str(error)+'），返回已识别页面后按任务列表继续')
+                daily._overview_ready=None;daily._overview_unlisted=set(OVERVIEW_ROUTES)
+                daily.recover_failed_task()
+                daily.b.settings['unordered_tasks']=False
+                report['execution_mode_fallback']='ordered'
+                task=pending[0]['key']
             entry=next(row for row in pending if row['key']==task);pending.remove(entry)
             daily.execute_entry(entry)
             stamina_remaining.discard(entry['id'])
@@ -686,7 +780,8 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
                     row.get('options',settings['task_options'][row['key']])['auto_three_shots'] or row.get('options',settings['task_options'][row['key']])['auto_potions']
                     for row in execution if row['key'] in STAMINA_TASKS):
                 try:daily.note(daily.replenish_queue_stamina(execution) if 'task_queue' in settings else daily.replenish_stamina())
-                except TaskBlocked as e:
+                except (UserStopped,SessionUnavailable):raise
+                except Exception as e:
                     report['stamina_refill']={'status':'blocked','message':str(e),'claimed':daily.report.get('stamina_claims',0)}
                     last=getattr(daily,'last_screen',None)
                     if last is not None:
@@ -694,18 +789,17 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
                         b.save_screen(last,path)
                         report['stamina_refill']['screenshot']=str(path)
                     daily.note('体力补充：'+str(e))
-                    try:daily.home()
-                    except TaskBlocked:raise SafetyStop(str(e))
+                    daily.recover_failed_task()
                 write_report(report)
             if settings['free_summon_enabled']:
-                daily.maybe_free_summon(daily.home())
-        s=daily.home();report['resources_end']=daily.world_resources(s)
+                daily.optional_step('任务间免费造唤',lambda:daily.maybe_free_summon(daily.home()))
+        s=daily.optional_step('结束返回',daily.home);report['resources_end']=daily.read_run_resources(s,'结束资源读取')
         a=report['resources_start']['diamonds'];z=report['resources_end']['diamonds']
         spent=report.get('merchant_diamond_spend',0)+report.get('piggy_diamond_spend',0)
         report['diamond_spend']=spent if not report.get('piggy_spend_unconfirmed') and a is not None and z is not None and z>=a-spent else None
-        incomplete=(any(v['status']=='blocked' for v in report['tasks'].values()) or
+        incomplete=(bool(report.get('optional_failures')) or any(v['status']=='blocked' for v in report['tasks'].values()) or
                     any(v['status'] in ('blocked','unconfirmed') for v in report.get('free_summons',[])) or
-                    report.get('stamina_refill',{}).get('status')=='blocked' or
+                    report.get('stamina_refill',{}).get('status')=='blocked' or report.get('stamina_refill_failures') or
                     (report.get('wild_checks') or [{}])[-1].get('status')=='navigation_failed' or
                     any(v['status'] in ('unconfirmed','interrupted','unrecognized') for v in report.get('wild_captures',[])) or
                     any(v['status'] in ('unreadable','unconfirmed','pending') for v in report.get('tribe_occupation_rewards',[])))
@@ -717,7 +811,7 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
             mumu_closed=False
             for entry in finishes:
                 ident=entry['id'];options=entry.get('options',daily.options['finish'])
-                if report['status']=='completed':
+                if report['status']=='completed' or (report['status']=='partial' and options.get('close_on_partial') and s is not None and is_world(s)):
                     daily.active_task='finish';daily.active_task_id=ident
                     report['tasks'][ident]={'status':'running','message':'正在结束关闭'}
                     emit('task',(ident,'运行中'));daily.note('开始：结束关闭，运行记录已保存')
@@ -763,14 +857,15 @@ def run_daily(settings,selected,stop,log=print,emit=lambda *a:None,diagnostic=Fa
 
 def close_game_and_mumu(b,log):
     # Another game may be running in another MuMu display. Never close that session.
-    from .backend import display_blocks,PACKAGE,NO_WINDOW
+    from .backend import display_blocks,NO_WINDOW
     import subprocess
+    package=b.controller.package
     text=b.controller.cmd('shell','dumpsys','window','displays')
     apps=[]
     for _,block in display_blocks(text):
-        for p in re.findall(r'mFocusedApp=.*?u0 ([\w.]+)/',block):
-            if p!=PACKAGE and p not in ('app.lawnchair','com.android.launcher3','com.mumu.launcher'):apps.append(p)
-    b.controller.cmd('shell','am','force-stop',PACKAGE)
+        for p in re.findall(r'(?:mFocusedApp|mCurrentFocus)=.*?u\d+ ([\w.]+)/',block):
+            if p!=package and p not in ('app.lawnchair','com.android.launcher3','com.mumu.launcher'):apps.append(p)
+    b.controller.cmd('shell','am','force-stop',package)
     if apps:
         log('已关闭超二；MuMu 中其他应用仍在运行，保留模拟器：'+', '.join(sorted(set(apps))));return False
     manager=Path(b.controller.adb).with_name('MuMuManager.exe')

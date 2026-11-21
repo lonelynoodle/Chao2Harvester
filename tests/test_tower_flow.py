@@ -25,6 +25,8 @@ class TowerGame:
         d.tower_secrets=lambda k,a:self.secrets.append(k['id']) or 1
         d.observe=self.observe;d.await_detail=self.observe
         d.b.click_at=self.click_at;d.b.click_text=self.click_text;d.b.sleep=lambda _:None
+        d.b.tasker=object()
+        d.b.read_text_region=lambda *a,**kw:f'{self.balance}/20'
 
     def home(self):self.home_calls+=1
 
@@ -77,10 +79,10 @@ class TowerGame:
 @pytest.mark.parametrize('mode',['battle','detail'])
 def test_continuous_floors_use_next_button_and_one_team_selection(tmp_path,mode):
     game=TowerGame(tmp_path,next_mode=mode)
-    assert game.d.tower()=='巨塔通关4层，秘庭1关；停止原因：浮空羽毛剩余0，已用完'
+    assert game.d.tower()=='巨塔通关4层，秘庭3关；停止原因：浮空羽毛剩余0，已用完'
     assert game.next_clicks==3 and game.detail_entries==1 and game.exits==0
     assert game.selected==[('normal',1)] and game.opened==['normal']
-    assert game.secrets==['normal'] and game.home_calls==1
+    assert game.secrets==['normal','dragon','puppet'] and game.home_calls==1
     assert game.d.report['dungeon_resources']['tower']['remaining']==0
     assert game.d.task_counts['tower']==4
 
@@ -96,14 +98,14 @@ def test_failure_rotates_locally_then_next_floor_restarts_team_priority(tmp_path
     game=TowerGame(tmp_path,balance=4,teams=(1,2),failures={('normal',1,1)})
     game.d.tower()
     assert game.challenges==[('normal',1,1),('normal',1,2),('normal',2,1),('normal',3,1)]
-    assert game.opened==['normal'] and game.secrets==['normal']
+    assert game.opened==['normal'] and game.secrets==['normal','dragon','puppet']
     assert game.selected==[('normal',1),('normal',2),('normal',1)]
 
 
-def test_all_teams_fail_switches_tower_and_only_checks_touched_secrets(tmp_path):
+def test_all_teams_fail_switches_tower_and_checks_selected_secrets(tmp_path):
     game=TowerGame(tmp_path,balance=4,teams=(1,2),failures={('normal',1,1),('normal',1,2)})
     game.d.tower()
-    assert game.opened==['normal','dragon'] and game.secrets==['normal','dragon']
+    assert game.opened==['normal','dragon'] and game.secrets==['normal','dragon','puppet']
     assert game.challenges[-2:]==[('dragon',1,1),('dragon',2,1)]
     assert game.d.report['tower_visited']==['normal','dragon']
 
@@ -128,17 +130,18 @@ def test_failed_floor_checks_its_secret_before_the_next_tower(tmp_path):
 
 
 @pytest.mark.parametrize('balance,reserve',[(0,0),(3,3),(2,5)])
-def test_shared_feathers_at_reserve_skip_all_other_towers_and_untouched_secrets(tmp_path,balance,reserve):
+def test_shared_feathers_at_reserve_skip_floors_and_check_selected_secrets(tmp_path,balance,reserve):
     game=TowerGame(tmp_path,balance=balance,reserve=reserve)
     game.d.tower()
-    assert game.opened==['normal'] and not game.challenges and not game.secrets
+    assert game.opened==['normal'] and not game.challenges
+    assert game.balance==balance and game.secrets==['normal','dragon','puppet']
 
 
 def test_last_feather_loss_stops_team_rotation_and_other_towers(tmp_path):
     game=TowerGame(tmp_path,balance=4,reserve=3,teams=(1,2),failures={('normal',1,1)})
     game.d.tower()
     assert game.challenges==[('normal',1,1)] and game.balance==3
-    assert game.opened==['normal'] and game.secrets==['normal']
+    assert game.opened==['normal'] and game.secrets==['normal','dragon','puppet']
 
 
 def test_budget_blocks_next_click_before_it_can_consume_an_extra_feather(tmp_path):
@@ -152,6 +155,44 @@ def test_disabled_secrets_stay_disabled_after_spending_all_feathers(tmp_path):
     game=TowerGame(tmp_path,balance=1);game.d.options['tower']['secret_garden']=False
     game.d.tower()
     assert not game.secrets
+
+
+@pytest.mark.parametrize('max_runs',[0,1])
+def test_zero_feathers_still_starts_and_settles_an_unlocked_free_secret(tmp_path,max_runs):
+    d=daily(tmp_path,{'task_options':{'tower':{'towers':[KINDS[0]],'max_runs':max_runs}}})
+    floors=screen(('浮空巨塔',124,14,90,30),('塔中秘庭31',950,580,160,36))
+    ready=screen(('浮空巨塔',124,14,90,30),('塔中秘庭31',240,450,140,30),
+                 ('塔中秘庭32',650,450,140,30))
+    ready.image[310:365,275:346]=(235,210,160)
+    ready.image[310:365,685:756]=(185,160,145)
+    settled=screen(*[(w.text,*w.box) for w in ready.words])
+    settled.image[310:365,685:756]=(185,160,145)
+    detail=screen(('塔中秘庭31',220,103,160,30),('敌方阵容',1025,112,100,30),
+                  ('首通奖励',174,555,74,23),('排阵',702,611,62,36),('挑战',946,613,62,36))
+    result=screen(('胜利',100,200,100,30),('获得奖励',900,300,100,30),('退出',1140,580,60,30))
+    current=[floors];actions=[]
+    d.open_tower=lambda kind:current[0]
+    d.observe=lambda *a:current[0]
+    d.b.tasker=object();d.b.read_text_region=lambda *a,**kw:'0/20'
+    d.b.sleep=lambda _:None;d.home=lambda:None
+    def click_text(s,pattern,**kw):
+        assert s is current[0] and s.find(pattern)
+        actions.append(pattern)
+        if s is floors:current[0]=ready
+        elif s is detail:current[0]=result
+        else:
+            assert s is result
+            current[0]=settled
+    def click_node(s,point,anchors,reason):
+        assert s is ready and reason=='打开已稳定的塔中秘庭31'
+        current[0]=detail
+    d.b.click_text=click_text;d.b.click_at=click_node
+    message=d.tower()
+    assert '巨塔通关0层，秘庭1关' in message
+    if max_runs:assert '达到该玩法设置的挑战次数' in message
+    assert actions==['^塔中秘庭31$','^挑战$|^前往挑战$','^退出$']
+    assert d.task_counts['tower']==1
+    assert d.report['resource_usage']['tower']['浮空羽毛']['spent']==0
 
 
 def test_real_secret_nodes_remain_available_without_new_unlock_label():

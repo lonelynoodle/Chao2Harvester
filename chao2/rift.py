@@ -1,11 +1,13 @@
 """Prefer the highest rift, fall back when unavailable; verify victory chests."""
 import re
 import math
+import cv2
+from types import SimpleNamespace
 from maa.pipeline import JTemplateMatch
 from .configuration import team_order
 from .policy import TaskBlocked,SafetyStop,FightLost
 from .activities import BudgetReached
-from .backend import Screen,Word
+from .backend import Screen,Word,ROOT
 
 RIFT_TITLE=r'^[凿幽]星裂痕$'
 RIFT_STAGE=r'^(\d{1,3})\s*[-－—]\s*[凿幽]星裂痕关卡\s*(\d{1,3})$'
@@ -79,7 +81,21 @@ def rift_node(b,s,number):
         template=f'rift-{kind}-'+('node' if kind=='next' else 'core')+'.png'
         result=b.wait(b.tasker.post_recognition('TemplateMatch',
             JTemplateMatch(template=[template],roi=[0,70,1280,485],threshold=[.8 if kind=='next' else .86]),s.image),10).get()
-        for node in result.nodes if result else []:
+        nodes=list(result.nodes) if result else []
+        if kind=='next' and not any(n.recognition and n.recognition.filtered_results for n in nodes):
+            # The road changes from blue to purple after stage 35. Match the
+            # same white symbol's shape without its background hue, retaining
+            # both exact number reads below before authorizing any click.
+            template_image=cv2.imread(str(ROOT/'resource/image'/template))
+            if template_image is not None:
+                gray=cv2.cvtColor(s.image[70:555],cv2.COLOR_BGR2GRAY)
+                patch=cv2.cvtColor(template_image,cv2.COLOR_BGR2GRAY)
+                _,score,_,point=cv2.minMaxLoc(cv2.matchTemplate(gray,patch,cv2.TM_CCOEFF_NORMED))
+                if score>=.9:
+                    x,y=point;h,w=patch.shape
+                    nodes.append(SimpleNamespace(recognition=SimpleNamespace(filtered_results=[
+                        SimpleNamespace(box=(x,y+70,w,h),score=float(score))])))
+        for node in nodes:
             if not node.recognition:continue
             for match in node.recognition.filtered_results:
                 x,y,w,h=match.box;cx=x+w//2;cy=y+h//2
@@ -93,10 +109,15 @@ def rift_node(b,s,number):
                 offset=22 if kind=='next' else 30
                 wide=((cx-21,cy+offset,42,28),(cx-21,cy+offset+2,42,28))
                 groups=[wide]
-                if label and label.score>=.8:
+                # This word only locates the crop. Its text/score does not
+                # authorize a node; both local reads still need the exact
+                # requested number (and their normal .8 OCR threshold).
+                if label and label.score>=.5:
                     x,y,lw,lh=label.box
                     tight=((x-2,y-2,lw+4,lh+4),(x-3,y-3,lw+6,lh+6))
-                    groups=[tight] if kind=='next' else [wide,tight]
+                    # The next-node glow can make one tight crop unreadable.
+                    # Keep the two independent wide reads available as well.
+                    groups=[wide,tight]
                 if not any(all(b.read_text_crop(s,roi)==str(number) for roi in rois)
                            for rois in groups):continue
                 found.append((float(match.score),kind,(cx,cy)))

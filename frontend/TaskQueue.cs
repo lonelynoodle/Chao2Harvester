@@ -354,6 +354,62 @@ public partial class MainWindow
         DeleteTaskTemplate(template,MessageBox.Show(this,$"删除“{template.Name}”？其任务顺序和设置将一并删除。","删除模板",MessageBoxButton.YesNo,MessageBoxImage.Question,MessageBoxResult.No)==MessageBoxResult.Yes);
     }
 
+    private async Task SmokeContinueFromTask()
+    {
+        if(!App.Smoke)throw new InvalidOperationException("续跑检查只能离线运行");
+        var template=SelectedTemplate!;var snapshot=QueueSnapshot();
+        try
+        {
+            AllowRepeatTasks=true;
+            var earlier=Tasks.First(t=>t.Key=="hunt");earlier.Enabled=true;
+            var start=CopyQueueTask(earlier) ?? throw new Exception("无法创建续跑测试任务");
+            start.Name="从这里继续";start.Enabled=true;
+            var later=CopyQueueTask(start) ?? throw new Exception("无法创建后续同名任务");
+            later.Options.First(o=>o.Key=="team").ChoiceId="3";
+            var disabled=Tasks.First(t=>t.Key=="arena");disabled.Enabled=false;
+            Tasks.Move(Tasks.IndexOf(disabled),Tasks.IndexOf(start)+1);
+            UnorderedTasks=true;SelectedTask=start;Save();
+            var expected=Tasks.Skip(Tasks.IndexOf(start)).Where(t=>t.Enabled).Select(t=>t.InstanceId).ToArray();
+            settings["_smoke_expected_suffix"]=Keys(expected);
+            TaskList.ScrollIntoView(start);UpdateLayout();
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            var buttons=VisualDescendants(TaskList).OfType<Button>().Where(b=>b.Name=="StartFromTaskButton").ToArray();
+            var startButton=buttons.Single(b=>ReferenceEquals(b.DataContext,start));
+            if(!startButton.IsEnabled || buttons.Single(b=>ReferenceEquals(b.DataContext,disabled)).IsEnabled)
+                throw new Exception("续跑按钮未遵守任务勾选状态");
+            startButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(Idle || startButton.IsEnabled || earlier.State!="本轮跳过" || disabled.State!="未启用")
+                throw new Exception("续跑启动状态或前序任务标记错误");
+            var deadline=DateTime.UtcNow.AddSeconds(15);
+            while(!Idle && DateTime.UtcNow<deadline)await Task.Delay(100);
+            if(!Idle || Status!="本轮完成" || !Logs.Any(l=>l.Text=="离线续跑队列已核对："+string.Join(",",expected)))
+                throw new Exception("从任务条续跑未通过桥接验证："+Status);
+            if(!UnorderedTasks || !settings["unordered_tasks"]!.GetValue<bool>() ||
+                settings["task_queue"]!.AsArray().Count!=Tasks.Count || !Tasks.Contains(earlier) || disabled.Enabled)
+                throw new Exception("续跑改写了原有顺序、勾选或模板");
+            Capture("wpf-continue-from-task.png");
+            start.Enabled=false;Save();
+            settings["_smoke_expected_single_task"]=start.InstanceId;
+            TaskList.ScrollIntoView(start);UpdateLayout();
+            await Dispatcher.InvokeAsync(()=>{},DispatcherPriority.ApplicationIdle);
+            var onlyButton=VisualDescendants(TaskList).OfType<Button>().Single(b=>b.Name=="RunOnlyTaskButton"&&ReferenceEquals(b.DataContext,start));
+            if(!onlyButton.IsEnabled)throw new Exception("未勾选任务不能单独运行");
+            onlyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if(Idle || onlyButton.IsEnabled || later.State!="本轮跳过" || start.State!="待执行")
+                throw new Exception("单条运行启动状态错误");
+            deadline=DateTime.UtcNow.AddSeconds(15);
+            while(!Idle && DateTime.UtcNow<deadline)await Task.Delay(100);
+            if(!Idle || Status!="本轮完成" || !Logs.Any(l=>l.Text=="离线单条队列已核对："+start.InstanceId) || start.Enabled)
+                throw new Exception("单条运行未通过桥接验证或改写了勾选");
+        }
+        finally
+        {
+            settings.Remove("_smoke_expected_suffix");
+            settings.Remove("_smoke_expected_single_task");
+            template.Snapshot=snapshot;ApplyTemplate(template);Save();
+        }
+    }
+
     private async Task SmokeTaskTemplates()
     {
         if(!App.Smoke)throw new InvalidOperationException("模板检查只能离线运行");

@@ -105,14 +105,12 @@ def test_user_stop_ends_repeated_taps_without_claiming_result(tmp_path,monkeypat
     assert d.task_counts['origin']==1 and not d.report.get('team_attempts')
 
 
-def test_permanently_unresponsive_button_still_obeys_battle_timeout(tmp_path,monkeypatch):
+def test_active_battle_keeps_waiting_after_old_timeout(tmp_path,monkeypatch):
     d,clock,clicks=setup(tmp_path,monkeypatch);d.b.settings['battle_timeout_seconds']=8
-    def observe():
-        s=battle();s.when=clock[0];return s
-    d.observe=observe
-    with pytest.raises(SafetyStop,match='未在时限内结算'):d.pvp_battle('origin')
-    assert len(clicks)==4 and clock[0]==8 and d.battles==1
-    assert d.report['pvp_settlements'][0]['outcome'] is None
+    done=result();frames(d,clock,[battle() for _ in range(12)]+[done])
+    assert d.pvp_battle('origin')[0] is done
+    assert len(clicks)==12 and clock[0]==24 and d.battles==1
+    assert d.report['battle_wait_extensions']
 
 
 def test_network_recovery_does_not_rematch_or_count_another_battle(tmp_path,monkeypatch):

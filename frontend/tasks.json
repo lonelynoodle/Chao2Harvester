@@ -21,9 +21,10 @@
   {
     "key": "copies",
     "name": "异象",
-    "description": "复制体挑战与游荡智者答题领奖，可分别开启",
+    "description": "领取被他人击破的复制体宝箱，再挑战复制体；游荡智者可分别开启",
     "settings": {
       "mode": "clear",
+      "hint": "开启复制体后，先免费领取被其他探索者击破的宝箱；没有20体力、好友币已满或达到挑战次数上限时仍会领奖。",
       "fields": [
         {
           "key": "challenge_copies",
@@ -40,6 +41,27 @@
           "max": 5,
           "enabled_when": "challenge_copies",
           "indent": 18
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "max_runs",
@@ -125,6 +147,27 @@
           "default": "2"
         },
         {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
+        },
+        {
           "key": "auto_settle",
           "type": "bool",
           "label": "自动点击结算",
@@ -162,10 +205,10 @@
   {
     "key": "main",
     "name": "主线关卡",
-    "description": "按阵容顺序闯关；全部失败后换关卡",
+    "description": "记录每关已尝试队伍；再次遇到旧关卡时换队",
     "settings": {
       "mode": "clear",
-      "hint": "按列表顺序尝试，通关后前进；全部失败再换关。",
+      "hint": "每次遇到关卡只用尚未尝试的下一支队伍；再次遇到旧关卡时继续换队，全部失败再跳过。",
       "fields": [
         {
           "key": "teams",
@@ -180,6 +223,27 @@
           "max": 5
         },
         {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
+        },
+        {
           "key": "max_runs",
           "type": "number",
           "label": "挑战上限（0不限）",
@@ -188,12 +252,28 @@
           "max": 100
         },
         {
-          "key": "max_nodes",
+          "key": "auto_deity",
+          "type": "bool",
+          "label": "神灵自动释放",
+          "default": true,
+          "description": "每场主线战斗开始后检查左下角，显示手动时切换为自动。"
+        },
+        {
+          "key": "search_limit_enabled",
+          "type": "bool",
+          "label": "限制本轮主线搜索次数",
+          "default": false
+        },
+        {
+          "key": "max_searches",
           "type": "number",
-          "label": "最多查找关卡（0为不限）",
-          "default": 20,
-          "min": 0,
-          "max": 100
+          "label": "最多搜索次数",
+          "default": 50,
+          "min": 1,
+          "max": 9999,
+          "enabled_when": "search_limit_enabled",
+          "indent": 18,
+          "description": "包含重复关卡和未打开详情的搜索，达到后继续下一个任务。"
         },
         {
           "key": "auto_three_shots",
@@ -225,6 +305,27 @@
           "default": [],
           "min": 1,
           "max": 5
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "max_runs",
@@ -307,6 +408,27 @@
           "default": [],
           "min": 1,
           "max": 5
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "reserve_spikes_enabled",
@@ -436,7 +558,7 @@
   {
     "key": "tribe",
     "name": "部落冒险",
-    "description": "优先冒险关卡，可在无关卡时随机挑战图腾，保留指定战令",
+    "description": "清理拍卖所和动态通知，领取累计捐献奖励与通关宝箱，再按设置挑战",
     "settings": {
       "mode": "clear",
       "hint": "按列表顺序尝试，通关后前进；全部失败再换关。",
@@ -450,6 +572,27 @@
           ],
           "min": 1,
           "max": 5
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "max_runs",
@@ -473,6 +616,24 @@
           "type": "bool",
           "label": "无可挑战冒险关卡时随机挑战图腾",
           "default": true
+        },
+        {
+          "key": "clear_auction_dot",
+          "type": "bool",
+          "label": "消除拍卖所红点（只查看，不竞价）",
+          "default": true
+        },
+        {
+          "key": "clear_dynamics_dot",
+          "type": "bool",
+          "label": "消除部落动态红点",
+          "default": true
+        },
+        {
+          "key": "claim_donation_rewards",
+          "type": "bool",
+          "label": "领取支配核心累计捐献奖励",
+          "default": true
         }
       ]
     }
@@ -495,6 +656,27 @@
           ],
           "min": 1,
           "max": 5
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "max_runs",
@@ -535,6 +717,27 @@
           ],
           "min": 1,
           "max": 5
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "max_runs",
@@ -669,6 +872,27 @@
           "max": 5
         },
         {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
+        },
+        {
           "key": "max_runs",
           "type": "number",
           "label": "挑战上限（0不限）",
@@ -702,6 +926,27 @@
           ],
           "min": 1,
           "max": 5
+        },
+        {
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
         },
         {
           "key": "max_runs",
@@ -767,9 +1012,9 @@
   {
     "key": "nest",
     "name": "谜之巢穴",
-    "description": "当天尚未挑战时完成一次暴走旷野",
+    "description": "挑战暴走旷野；勾选重复挑战后，已有成绩也再打一轮",
     "settings": {
-      "hint": "当天未挑战过才完成暴走旷野。默认沿用当前完整阵容和援军；选择多队时按顺序执行，受挑战上限约束。",
+      "hint": "当天没有成绩时挑战。勾选重复挑战后，即使已有成绩，也按所选队伍再打一轮；保留当前援军。",
       "mode": "score",
       "fields": [
         {
@@ -781,12 +1026,37 @@
           "max": 5
         },
         {
-          "key": "max_runs",
-          "type": "number",
-          "label": "挑战上限（0不限）",
-          "default": 1,
-          "min": 0,
-          "max": 100
+          "key": "wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "attack",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。"
+        },
+        {
+          "key": "auto_deity",
+          "type": "bool",
+          "label": "神灵自动释放",
+          "default": true
+        },
+        {
+          "key": "repeat_challenge",
+          "type": "bool",
+          "label": "重复挑战",
+          "default": false
         },
         {
           "key": "buff_priority",
@@ -896,6 +1166,29 @@
           ],
           "min": 1,
           "max": 5,
+          "enabled_when": "giant",
+          "indent": 18
+        },
+        {
+          "key": "giant_wall_mode",
+          "type": "choice",
+          "label": "战墙",
+          "choices": [
+            {
+              "id": "ignore",
+              "label": "忽视（不检查）"
+            },
+            {
+              "id": "attack",
+              "label": "进攻型"
+            },
+            {
+              "id": "defense",
+              "label": "防御型"
+            }
+          ],
+          "default": "ignore",
+          "description": "本轮已确认且类型相同时直接沿用；需要另一类型时再切换。忽视时不检查、不切换；结束后不恢复。",
           "enabled_when": "giant",
           "indent": 18
         },
@@ -1073,6 +1366,44 @@
           "default": true,
           "compact": true,
           "group": "collect_daily_single"
+        },
+        {
+          "key": "daily_core_upgrade",
+          "type": "bool",
+          "label": "每日挑战 · 升级元核",
+          "default": false,
+          "description": "按元核列表逐个查找，可选顺序或倒序，确认单次强化成功后停止。",
+          "compact": true,
+          "group": "daily_core_upgrade"
+        },
+        {
+          "key": "daily_core_order",
+          "type": "choice",
+          "label": "元核查找顺序",
+          "choices": [
+            {
+              "id": "forward",
+              "label": "按列表顺序"
+            },
+            {
+              "id": "reverse",
+              "label": "按列表倒序"
+            }
+          ],
+          "default": "forward",
+          "enabled_when": "daily_core_upgrade",
+          "indent": 18,
+          "compact": true,
+          "group": "daily_core_upgrade"
+        },
+        {
+          "key": "daily_monster_upgrade",
+          "type": "bool",
+          "label": "每日挑战 · 升级怪兽",
+          "default": false,
+          "description": "从左往右检查怪兽，用已有怪兽经验升一级，成功后停止。",
+          "compact": true,
+          "group": "daily_monster_upgrade"
         },
         {
           "key": "collect_plane_lord",
@@ -1293,6 +1624,48 @@
           "group": "open_monster_boxes"
         },
         {
+          "key": "evolve_blue_monsters",
+          "type": "bool",
+          "label": "蓝怪进化紫怪",
+          "default": false,
+          "description": "进化后保留紫怪，跳过锁定蓝怪；可按只数进化，或持续到可用蓝怪、进化孢子不足。金币不足也会停止。",
+          "compact": true,
+          "group": "evolve_blue_monsters"
+        },
+        {
+          "key": "blue_evolution_mode",
+          "type": "choice",
+          "label": "进化方式",
+          "choices": [
+            {
+              "id": "count",
+              "label": "指定只数"
+            },
+            {
+              "id": "until_empty",
+              "label": "直到蓝怪或进化孢子不足"
+            }
+          ],
+          "default": "count",
+          "enabled_when": "evolve_blue_monsters",
+          "indent": 18,
+          "compact": true,
+          "group": "evolve_blue_monsters"
+        },
+        {
+          "key": "blue_evolution_count",
+          "type": "number",
+          "label": "进化只数",
+          "default": 1,
+          "min": 1,
+          "max": 999999,
+          "enabled_when": "blue_evolution_mode",
+          "enabled_value": "count",
+          "indent": 18,
+          "compact": true,
+          "group": "evolve_blue_monsters"
+        },
+        {
           "key": "clear_bag_notifications",
           "type": "bool",
           "label": "清除背包新物品感叹号",
@@ -1316,7 +1689,7 @@
     "name": "结束关闭",
     "description": "完成并保存记录后，关闭超二收菜和MuMu",
     "settings": {
-      "hint": "全部任务完成并保存记录后关闭；遇到失败或手动停止时保留现场。",
+      "hint": "保存记录后结束关闭。默认仅全部完成时关闭；可允许部分完成后关闭，但手动停止、设备异常和未知页面仍保留现场。",
       "fields": [
         {
           "key": "close_mumu",
@@ -1330,6 +1703,13 @@
           "label": "关闭超二收菜",
           "default": true,
           "notice": "关闭后可能无法看到捕捉怪兽的信息；可在运行记录中查看。"
+        },
+        {
+          "key": "close_on_partial",
+          "type": "bool",
+          "label": "部分任务未完成也关闭",
+          "default": false,
+          "description": "全部任务已处理且确认返回世界后关闭；手动停止和未知页面除外。"
         }
       ]
     }

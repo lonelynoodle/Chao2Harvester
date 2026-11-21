@@ -12,7 +12,7 @@ from chao2.rift import (is_rift_map,rift_detail,is_rift_victory,rift_chest_keys,
 def test_defaults_preserve_existing_selection():
     s=normalize_settings({'tasks':['copies','cocoon']})
     assert s['tasks']==['copies','cocoon']
-    assert s['task_options']['rift']=={'teams':[2,1],'max_runs':0,'reserve_keys':0}
+    assert s['task_options']['rift']=={'teams':[2,1],'wall_mode':'ignore','max_runs':0,'reserve_keys':0}
     assert plan_tasks(s,['rift'],ORDER)==['rift']
 
 

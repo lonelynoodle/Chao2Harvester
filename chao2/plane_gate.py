@@ -2,20 +2,42 @@
 import re
 from functools import lru_cache
 import cv2
-from .backend import ROOT,Word
+from .backend import ROOT,Word,Screen
 from .policy import TaskBlocked
 
 GATE_TITLE=r'^[\u4e00-\u9fff]{1,8}之门$'
 GATE_REQUIREMENT=r'^解锁条件\s*[:：]\s*世界总探索度到达\s*\d+(?:\.\d+)?\s*[%％]$'
+GATE_TITLE_ROI=(210,60,490,65)
+GATE_REQUIREMENT_ROI=(430,145,560,70)
+GATE_ENTRY_ROI=(535,400,205,115)
+GATE_OTHER_CONTROLS='^取消$|^确定$|^购买$|^获得奖励$|^退出$|^排阵$'
 
 
 def plane_gate_window(s):
-    title=s.find(GATE_TITLE,(210,60,490,65))
-    requirement=s.find(GATE_REQUIREMENT,(430,145,560,70))
-    entry=s.find('^进入$|^未解锁$',(535,400,205,115))
-    if not (title and requirement and entry):return None
-    if s.find('^取消$|^确定$|^购买$|^获得奖励$|^退出$|^排阵$'):return None
-    return title,requirement,entry
+    title=s.find(GATE_TITLE,GATE_TITLE_ROI)
+    requirement=s.find(GATE_REQUIREMENT,GATE_REQUIREMENT_ROI)
+    entry=s.find('^进入$|^未解锁$',GATE_ENTRY_ROI)
+    if not (title and entry) or s.find(GATE_OTHER_CONTROLS):return None
+    # Unlocked gates omit the exploration requirement entirely. In that layout
+    # require the real close icon as well as both captions, never the HUD behind it.
+    if requirement is None and (entry.text!='进入' or gate_close_icon(s) is None):return None
+    return tuple(w for w in (title,requirement,entry) if w is not None)
+
+
+def recover_plane_gate_labels(b,s):
+    """Re-OCR a possible gate's own controls, without choosing a destination."""
+    if plane_gate_window(s) or b.tasker is None or s.find(GATE_OTHER_CONTROLS) or gate_close_icon(s) is None:
+        return s
+    b.guard(s)
+    q=Screen(s.image,list(s.words),s.when)
+    for pattern,roi in ((GATE_TITLE,GATE_TITLE_ROI),('^进入$|^未解锁$',GATE_ENTRY_ROI),
+                        (GATE_REQUIREMENT,GATE_REQUIREMENT_ROI)):
+        if q.find(pattern,roi):continue
+        for scale in (3,4):
+            b.confirm_label(q,pattern,roi,scale=scale,threshold=.8)
+            if q.find(pattern,roi):break
+        if plane_gate_window(q):break
+    return q if len(q.words)!=len(s.words) else s
 
 
 @lru_cache(maxsize=1)

@@ -104,7 +104,9 @@ def test_tribe_unknown_balance_blocks_input(tmp_path):
 
 def test_tribe_selection_and_settings_do_not_change_stamina_plan():
     settings=normalize_settings({'tasks':['tribe','hunt']})
-    assert settings['task_options']['tribe']=={'teams':[2],'max_runs':0,'reserve_orders':0,'random_totem':True}
+    assert settings['task_options']['tribe']=={'teams':[2],'wall_mode':'ignore','max_runs':0,'reserve_orders':0,'random_totem':True,
+                                            'clear_auction_dot':True,'clear_dynamics_dot':True,
+                                            'claim_donation_rewards':True}
     assert plan_tasks(settings,settings['tasks'],ORDER)==['hunt','tribe']
     assert 'tribe' not in normalize_settings({'tasks':['hunt']})['tasks']
     for bad in [-1,1.5,True,10000]:

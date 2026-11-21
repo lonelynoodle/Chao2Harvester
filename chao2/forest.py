@@ -14,8 +14,9 @@ from PIL import Image
 from .backend import ROOT,Word
 from .configuration import selected_rows,team_order
 from .overview import forest_overview_busy
-from .policy import TaskBlocked,SafetyStop,FightLost
+from .policy import TaskBlocked,ResourceReadError,SafetyStop,FightLost
 from .activities import BudgetReached
+from .fixed_hud import FOREST_POINTS_ROI,HUD_SCALES,fixed_hud_ratio
 
 LABELS={'lamp':'森灯','beast':'凶兽','spore':'强化孢子','divinity':'神性孢子',
         'evolution':'进化孢子','spring':'命运之泉','unknown':'未探明节点'}
@@ -23,6 +24,7 @@ NODE_ROI=(20,90,1135,535)
 INSTANT_KINDS={'spore','divinity','evolution','lamp','spring'}
 PAN_RETRIES=3
 CHALLENGE_SYMBOLS=('forest-challenge-star.png','forest-challenge-explorer.png')
+FOREST_POINTS_SCALES=HUD_SCALES
 
 
 class ForestWaiting(BudgetReached):
@@ -37,12 +39,16 @@ def is_forest_map(s):
     return bool((title.min(axis=2)>165).mean()>.12)
 
 
-def forest_detail(s):
-    if not s.has('^敌方阵容$','^排阵$','^挑战$','可获得奖励'):return None
+def forest_detail_name(s):
     # A revealed pink challenge node is another explorer, rather than a
     # beast. The closing parenthesis may be clipped at the title decoration.
     w=s.find(r'.*凶兽$|^其他探索者[（(]特殊事件[）)]?$',(20,115,500,65))
     return w.text if w else None
+
+
+def forest_detail(s):
+    if not s.has('^敌方阵容$','^排阵$','^挑战$','可获得奖励'):return None
+    return forest_detail_name(s)
 
 
 def forest_timer(s):
@@ -56,9 +62,12 @@ def forest_timer(s):
 
 def forest_points(b,s):
     if not is_forest_map(s):raise TaskBlocked('森林地图未确认，未读取探索点')
-    pair=b.read_resource_ratio(s,(1090,0,105,65))
-    if not pair or not 0<=pair[0]<=999 or pair[1]<1:raise TaskBlocked('森林探索点未读清')
-    return pair[0]
+    # The full-frame detector can merge this HUD with map-node labels behind
+    # it (0/16 -> 0l6ff;). Always crop the fixed number field and run BOTH
+    # text detection and recognition locally; never reuse full-frame words.
+    pair,reads=fixed_hud_ratio(b,s,FOREST_POINTS_ROI)
+    if pair is not None:return pair[0]
+    raise ResourceReadError('森林探索点未读清（固定区域局部识别，最多4次；'+'；'.join(reads)+'）')
 
 
 def forest_collect_ready(b,s):
@@ -486,6 +495,10 @@ class ForestActivity:
                 if name is not None and name!=actual:raise TaskBlocked('森林凶兽目标改变')
                 return s
             self.b.sleep(.5)
+        failures=self.report.setdefault('forest_detail_failures',[])
+        path=self.report['folder']/f'forest-detail-unrecognized-{len(failures)+1}.png'
+        self.b.save_screen(s,path)
+        failures.append({'name':name,'screenshot':str(path)})
         raise TaskBlocked('森林节点详情未识别，未挑战或使用燃火')
 
     def forest_challenge(self,s,node):
@@ -641,9 +654,10 @@ class ForestActivity:
         self._forest_simple_recovery_start=len(self.report.get('forest_simple_recoveries',[]))
         def sweep():return {'phase':'left','direction':-400,'steps':0,'leg':0}
         def recover(error):
+            if isinstance(error,ResourceReadError):raise error
             while True:
                 try:return self.forest_simple_reenter(error)
-                except BudgetReached:raise
+                except (BudgetReached,ResourceReadError):raise
                 except TaskBlocked as retry:
                     if len(self.report.get('forest_simple_recoveries',[]))-self._forest_simple_recovery_start>=3:raise
                     error=retry

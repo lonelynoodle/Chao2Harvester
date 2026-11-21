@@ -1,5 +1,6 @@
 """Cumulative, observed resource accounting across stamina refills."""
 from .policy import parse_ratio
+from .fixed_hud import tower_feathers
 
 PRIMARY_RESOURCES={
     'copies':('地图体力',20),'hunt':('地图体力',10),'main':('地图体力',5),
@@ -8,6 +9,10 @@ PRIMARY_RESOURCES={
 
 
 class TaskReporting:
+    def dungeon_ratio(self,task,s,roi=(1140,0,140,65)):
+        if task=='tower':return tower_feathers(self.b,s,map_view=roi==(1030,0,170,65))
+        return self.b.read_resource_ratio(s,roi)
+
     def resource_balance(self,task,label,remaining):
         row=self.report.setdefault('resource_usage',{}).setdefault(task,{}).setdefault(
             label,{'start':remaining,'remaining':remaining,'spent':0,'unverified':0})
@@ -24,7 +29,7 @@ class TaskReporting:
     def settle_battle_resource(self,task,result,outcome,before):
         if task not in PRIMARY_RESOURCES or before is None:return
         label,cost=PRIMARY_RESOURCES[task]
-        ratio=parse_ratio(result.region_text((1140,0,140,65)))
+        ratio=self.dungeon_ratio(task,result) if task=='tower' else parse_ratio(result.region_text((1140,0,140,65)))
         after=ratio[0] if ratio else None
         # A confirmed victory charges the verified entry price. Natural stamina
         # recovery can make the balance decrease smaller than that price.
@@ -53,6 +58,8 @@ class TaskReporting:
         attempts=self.task_attempts(task)
         count=self.task_counts.get(task,len(attempts))
         pieces=[f'本轮累计挑战{count}次，胜利{sum(r.get("outcome")=="victory" for r in attempts)}次']
+        unknown=sum(r.get('outcome')=='unobserved' for r in attempts)
+        if unknown:pieces.append(f'{unknown}场胜败未观察到，已按当前页面核对资源')
         scores=sum(r.get('outcome')=='score' for r in attempts)
         if scores:pieces.append(f'伤害结算{scores}次')
         for label,row in self.report.get('resource_usage',{}).get(task,{}).items():

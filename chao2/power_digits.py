@@ -26,6 +26,8 @@ def glyphs(image,roi):
 
 @lru_cache(maxsize=1)
 def bank():
+    # Include verified render variants (notably the narrow 6 in six-digit
+    # powers). Keep confidence/margin checks below; OCR must not fill gaps.
     data=json.loads((Path(__file__).resolve().parents[1]/'resource/arena-power-digits.json').read_text('utf-8'))
     return {key:[np.array(a,dtype=np.uint8).reshape(24,16) for a in values] for key,values in data.items()}
 

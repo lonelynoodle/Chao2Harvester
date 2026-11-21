@@ -5,11 +5,23 @@ import re
 import time
 from datetime import datetime,timezone,timedelta
 from .configuration import team_order,RAMPAGE_BUFFS
-from .policy import TaskBlocked,SafetyStop,parse_ratio
+from .policy import TaskBlocked,SafetyStop,PageChanged,parse_ratio
 from .backend import Word
+from .control_retry import retry_point
 
 BEIJING=timezone(timedelta(hours=8))
 RANK_CHANGE_PATTERN=r'^段位(?:提升|下降|变更)$'
+NEST_HEADER=r'^[谜迷]之巢穴$'
+RAMPAGE_TITLE=r'^暴走旷野$'
+RAMPAGE_RESULT=('本场击破数','本场金币奖励')
+
+
+def rampage_selector(s):
+    return s.find(NEST_HEADER,(80,0,450,75)) and s.find(RAMPAGE_TITLE,(425,580,430,130))
+
+
+def rampage_challenge_page(s):
+    return s.has(NEST_HEADER,RAMPAGE_TITLE,'最高击破数','^挑战$')
 
 
 def rank_change_notice(s):
@@ -17,13 +29,27 @@ def rank_change_notice(s):
     return s.find(RANK_CHANGE_PATTERN,(450,400,380,160))
 
 
+def defeat_action_count(s):
+    return sum(bool(s.find('^'+name+'$',(580,330,700,190)))
+               for name in ('怪兽培育','元核升级','神灵升阶','阵容调整','黑暗森林'))
+
+
+def standard_defeat(s):
+    # These improvement links only occur on the defeat overlay. The large
+    # stylized title is often absent from OCR in both arena and origin.
+    return bool(s.find('^退出$',(1070,535,210,145)) and
+                (defeat_action_count(s)>=3 or
+                 (s.find('通过下列方式提高战力') and defeat_action_count(s)>=2)))
+
+
 def pvp_result(s):
     if not s.find('^退出$',(1070,535,210,145)):return None
+    if standard_defeat(s):return 'failed'
     if s.find('胜利'):return 'victory'
     if s.find('失败|败退|挑战失败'):return 'failed'
     # The stylized defeat title is often absent from OCR. Require the origin
     # score's negative delta and the defeat-only improvement links together.
-    if s.find('^起源殿积分$',(680,220,260,100)):
+    if s.find('^起源殿积分$|^斗技场积分$',(680,220,260,100)):
         delta=re.search(r'[（(]\s*[-−]\s*\d+\s*[)）]',s.region_text((920,220,340,100)))
         links=sum(bool(s.find('^'+name+'$',(580,350,700,160)))
                   for name in ('怪兽培育','元核升级','神灵升阶','阵容调整','黑暗森林'))
@@ -131,13 +157,13 @@ def arena_quota(s):
     if not ratio or not 0<=ratio[0]<=ratio[1]<=99:return None
     return ratio[0]
 
-BUFF_PATTERNS={'assist':'怪兽助战|助战|援军|加入.*怪兽','lifesteal':'吸血|生命偷取',
+BUFF_PATTERNS={'assist':'怪兽助战|助战|援军|加入.*怪兽|召唤此怪兽出战','lifesteal':'吸血|生命偷取|造成伤害.*回复自身血量',
  'attack':'攻击力|攻击.*提升','level':'等级提升|怪兽等级','damage':'伤害提升',
  'reduction':'伤害降低|减伤|受到.*降低','health':'生命.*提升|生命上限',
  'revive':'复活','dominance':'霸气','size':'体型|膨胀','speed':'移速|移动速度','heal':'恢复|回复|治疗'}
 
-def rampage_buff(s,priority=None):
-    if not s.find('请选择一个暴走增益'):return None
+def rampage_buff_cards(s,priority=None):
+    if not s.find('请选择一个暴走增益'):return []
     cards=[]
     for left in (30,450,870):
         roi=(left,165,380,440)
@@ -147,10 +173,54 @@ def rampage_buff(s,priority=None):
         order=[r['id'] for r in priority if r['enabled']] if priority is not None else [k for k,_ in RAMPAGE_BUFFS]
         rank=next((i for i,key in enumerate(order) if re.search(BUFF_PATTERNS[key],text)),len(order))
         cards.append((rank,button,text))
+    return cards
+
+
+def rampage_buff(s,priority=None):
+    cards=rampage_buff_cards(s,priority)
+    if not cards:return None
     _,button,text=min(cards,key=lambda c:c[0])
     return button,text
 
 class DailyChallenges:
+    def choose_rampage_buff(self,s):
+        from .battle_takeover import takeover_phase
+        from .result_navigation import exit_destination
+        from .policy import IsolatedTaskError
+        def signature(q):
+            return tuple(''.join(sorted(re.sub(r'[\W_]+','',q.region_text((x,165,380,440)))))
+                         for x in (30,450,870))
+        source=signature(s)
+        row={'task':self.active_task,'clicks':0,'points':[],'status':'pending'}
+        self.report.setdefault('rampage_buff_selections',[]).append(row)
+        def changed(q):
+            if q.find('请选择一个暴走增益'):return signature(q)!=source
+            return takeover_phase(q) is not None or exit_destination(q) is not None
+        def choose(q):
+            if not q.find('请选择一个暴走增益') or signature(q)!=source:return
+            button,description=rampage_buff(q,self.options['nest']['buff_priority'])
+            point=retry_point(button,row['clicks'])
+            self.b.click_at(q,point,['请选择一个暴走增益','^点击选择$'],'选择暴走增益：'+description)
+            row['description']=description;row['clicks']+=1;row['points'].append(list(point))
+            self.checkpoint()
+        self.b.save_screen(s,self.report['folder']/'rampage-buff.png')
+        try:
+            cards=rampage_buff_cards(s,self.options['nest']['buff_priority'])
+            row['candidates']=[{'priority':rank,'description':text} for rank,_,text in cards]
+            for i,(_,_,text) in enumerate(cards,1):
+                self.note(f'暴走增益候选{i}：'+re.sub(r'\s+',' ',text.replace('点击选择','')).strip())
+            q=self.navigation_input(s,choose)
+            if q is None or not changed(q):
+                q=self.wait_for_screen(changed,'暴走增益选择后页面推进',timeout=3,retry_navigation=choose)
+        except TaskBlocked as error:
+            row.update(status='unconfirmed',reason=str(error));self.checkpoint()
+            raise IsolatedTaskError('暴走增益补点3次仍未确认，回退后继续下一任务') from error
+        row['status']='advanced';self.checkpoint()
+        if not row['clicks']:return q
+        self.note('暴走旷野已选择增益：'+re.sub(r'\s+',' ',row['description'].replace('点击选择','')).strip()+
+                  (f'（重新识别后补点{row["clicks"]-1}次）' if row['clicks']>1 else ''))
+        return q
+
     def dismiss_rank_change(self,s):
         notice=rank_change_notice(s)
         if notice is None:return s
@@ -206,21 +276,26 @@ class DailyChallenges:
         self.b.save_screen(s,self.report['folder']/(task+'-quota.png'))
         return s,value
 
-    def enter_building(self,title,*anchors):
+    def enter_building(self,title,*anchors,source=None):
         task={'斗技场':'arena','谜之巢穴':'nest'}.get(title)
-        pattern='^[谜迷]之巢穴$' if title=='谜之巢穴' else '^'+title+'$'
-        if task and self.overview_prepared_for(task):
+        pattern=NEST_HEADER if task=='nest' else '^'+title+'$'
+        if source is None and task and self.overview_prepared_for(task):
             return self.enter_overview(pattern)
         try:
-            s=self.territory()
-            if title=='谜之巢穴':
+            s=source if source is not None else self.territory()
+            if task=='nest':
                 # The 永生之茧 map label is the nest entrance's territory anchor;
                 # full-frame OCR can miss it, so re-read the region before stopping.
-                self.b.confirm_label(s,'永生之茧',(780,140,210,170))
-                self.b.click_at(s,(523,80),['^世界$','^排阵$','永生之茧'],'进入谜之巢穴')
+                from .territory_labels import is_territory
+                def enter(q):
+                    if not is_territory(q):return
+                    self.b.confirm_label(q,'永生之茧',(780,140,210,170))
+                    self.b.click_at(q,(523,80),['^世界$','^排阵$','永生之茧'],'进入谜之巢穴')
+                enter(s)
+                return self.wait_for_screen(lambda q:q.has(pattern,*anchors),'进入谜之巢穴',timeout=4,retry_navigation=enter)
             else:self.b.click_text(s,'^'+title+'$',roi=(170,35,990,590))
             return self.await_page(pattern,*anchors)
-        except TaskBlocked as e:
+        except (TaskBlocked,PageChanged) as e:
             # Map anchors are the least reliable evidence in this game. The
             # 任务挑战 overview keeps a second entrance that is located by its
             # card title while scrolling, so retry there instead of giving up.
@@ -307,6 +382,7 @@ class DailyChallenges:
         self.b.click_at(s,rows[0]['point'],['^斗技场$','挑战次数'],'打开预览核对出战队伍')
         detail=self.arena_detail()
         if change_team:detail=self.select_team(detail,team,return_page=self.arena_detail)
+        detail=self.prepare_battle_wall('arena',detail)
         for attempt in range(4):
             self.b.guard(detail)
             try:power=self.arena_own_power(detail);break
@@ -369,10 +445,9 @@ class DailyChallenges:
         self.task_counts[task]=self.task_counts.get(task,0)+1
         settlement={'task':task,'attempt':self.task_counts[task],'clicks':0,'outcome':None}
         self.report.setdefault('pvp_settlements',[]).append(settlement)
-        until=time.monotonic()+int(self.b.settings.get('battle_timeout_seconds',240))
-        feedback=time.monotonic();network_retries=0;preview_saved=False
-        while time.monotonic()<until:
-            s=entry if entry is not None else self.observe_battle();entry=None;self.b.guard(s)
+        feedback=time.monotonic();network_retries=0;preview_saved=False;returned={'started':time.monotonic()}
+        for s in self.battle_frames(int(self.b.settings.get('battle_timeout_seconds',240)),'免费对战',first=entry,clock=time.monotonic):
+            self.b.guard(s)
             if self.retry_battle_network(s,network_retries):
                 network_retries+=1;continue
             if rank_change_notice(s):s=self.dismiss_rank_change(s)
@@ -383,6 +458,10 @@ class DailyChallenges:
                 self.b.save_screen(s,self.report['folder']/(task+'-result.png'))
                 settlement['outcome']=outcome;self.checkpoint()
                 return s,outcome
+            page=self.battle_return_page(s,returned,ready=preview_saved or settlement['clicks']>0)
+            if page:
+                settlement.update(outcome='unobserved',destination=page);self.checkpoint()
+                return s,'unobserved'
             if s.find('结算') and not s.find('^匹配$'):
                 self.b.save_screen(s,self.report['folder']/(task+'-settle-control.png'))
             if not preview_saved and s.find(r'\d{1,2}:\d{2}',(490,0,300,100)):
@@ -405,13 +484,13 @@ class DailyChallenges:
                 self.note(('起源殿' if task=='origin' else '斗技场')+'战斗或匹配中，等待结算…')
                 feedback=time.monotonic()
             self.b.sleep(2)
-        raise SafetyStop('免费对战未在时限内结算，保留现场')
 
     def retry_battle_network(self,s,retries):
-        if not s.has(r'^网络翻船中，是否重试[?？]$','^确定$','^取消$'):return False
+        from .network_recovery import network_retry_button,NETWORK_CONFIRM_ROI
+        if not network_retry_button(s):return False
         if retries>=2:raise SafetyStop('战斗网络重试两次仍未恢复，保留现场')
         self.note('游戏连接中断，重试本次结算（不重新开战）')
-        self.b.click_text(s,'^确定$',roi=(690,440,210,100))
+        self.b.click_text(s,'^确定$',roi=NETWORK_CONFIRM_ROI)
         return True
 
     def record_daily_fight(self,task,team,outcome,**details):
@@ -484,8 +563,9 @@ class DailyChallenges:
                 power_gap=own_power-candidate['power'] if own_power is not None else None,mode=mode,
                 selection_mode=search['selection_mode'],search_refreshes=search['refreshes'],fallback=search['fallback'],
                 remaining=after,quota_verified=after==before-1)
-            self.resource_spent('arena','免费次数',1 if after==before-1 else None,after)
-            if after!=before-1:
+            spent=self.returned_quota_spent('arena',before,after,outcome)
+            self.resource_spent('arena','免费次数',spent,after)
+            if spent is None:
                 raise TaskBlocked(f'斗技场已结算，但免费次数变化未确认（挑战前{before}，之后{after if after is not None else "未读清"}），停止连打')
             self.note(f'斗技场已结算{count}场，剩余{after}次')
         self.home()
@@ -527,20 +607,33 @@ class DailyChallenges:
             if before is None or before<=0:raise TaskBlocked('起源殿免费次数未确认，停止匹配')
             if not origin_is_open():continue
             self.check_budget('origin');self.active_task='origin'
+            s=self.prepare_battle_wall('origin',s)
             self.b.click_text(s,'^匹配$')
             result,outcome=self.pvp_battle('origin');self.exit_result(result)
             s=self.await_page('^起源殿$','^匹配$','剩余免费挑战次数')
             s,after=self.await_pvp_quota(s,'origin',before-1)
             count+=1;self.report['origin_remaining']=after
             self.record_daily_fight('origin',team,outcome,remaining=after,quota_verified=after==before-1)
-            self.resource_spent('origin','免费次数',1 if after==before-1 else None,after)
-            if after!=before-1:
+            spent=self.returned_quota_spent('origin',before,after,outcome)
+            self.resource_spent('origin','免费次数',spent,after)
+            if spent is None:
                 raise TaskBlocked(f'起源殿已结算，但免费次数变化未确认（挑战前{before}，之后{after if after is not None else "未读清"}），停止连打')
             self.note(f'起源殿已结算{count}场，剩余{after}次')
         self.home();return f'起源殿已结算{count}场，免费次数已用完'
 
-    def rampage_ready(self):
-        return self.await_page('^[谜迷]之巢穴$','^暴走旷野$','最高击破数','^挑战$')
+    def rampage_ready(self,s=None):
+        from .result_navigation import exit_destination
+        def select(q):
+            page=exit_destination(q)
+            if page=='tasks':q=self.overview_entry('nest',reason='已返回任务挑战，继续谜之巢穴')
+            elif page in ('territory','world'):
+                q=self.enter_building('谜之巢穴',RAMPAGE_TITLE,source=q if page=='territory' else None)
+            if rampage_selector(q):self.b.click_text(q,RAMPAGE_TITLE,roi=(425,580,430,130))
+        if s is not None:
+            if rampage_challenge_page(s):return s
+            resumed=self.navigation_input(s,select)
+            if resumed is not None and rampage_challenge_page(resumed):return resumed
+        return self.wait_for_screen(rampage_challenge_page,'暴走旷野挑战页',timeout=4,retry_navigation=select)
 
     def rampage_score(self,s):
         if not s.has('^[谜迷]之巢穴$','最高击破数','我的排名'):
@@ -562,50 +655,94 @@ class DailyChallenges:
         if score is None:raise TaskBlocked('暴走旷野今日击破数未读清')
         return score
 
+    def read_rampage_score(self,s):
+        for attempt in range(3):
+            try:return s,self.rampage_score(s)
+            except TaskBlocked:
+                if attempt==2:break
+                self.b.sleep(.6);s=self.rampage_ready()
+        return s,None
+
     def rampage_battle(self):
         self.battles+=1;self.task_counts['nest']=self.task_counts.get('nest',0)+1
-        until=time.monotonic()+720;feedback=time.monotonic();network_retries=0
-        while time.monotonic()<until:
-            s=self.observe_battle();self.b.guard(s)
+        feedback=time.monotonic();network_retries=0;returned={'started':time.monotonic()}
+        auto_state={'clicks':0,'status':'pending' if self.options['nest']['auto_deity'] else 'disabled'}
+        self.report.setdefault('nest_auto_deity',[]).append(auto_state)
+        for s in self.battle_frames(720,'暴走旷野',clock=time.monotonic):
+            self.b.guard(s)
             if self.retry_battle_network(s,network_retries):
                 network_retries+=1;continue
             if s.find('请选择一个暴走增益'):
-                button,description=rampage_buff(s,self.options['nest']['buff_priority'])
-                self.b.save_screen(s,self.report['folder']/'rampage-buff.png')
-                self.b.click_at(s,button.center,['请选择一个暴走增益','^点击选择$'],'选择暴走增益：'+description)
-                self.note('暴走旷野已选择增益：'+description)
+                self.choose_rampage_buff(s)
                 continue
-            if s.has('^退出$','本场击破数','本场金币奖励'):
-                self.b.save_screen(s,self.report['folder']/'rampage-result.png')
-                kills=s.find(r'^(?:新纪录)?\d{1,6}$',(1050,355,200,45))
-                coins=s.find(r'^\d{1,9}$',(1070,400,180,45))
-                self.report['rampage_settlement']={'kills':int(re.search(r'\d+$',kills.text)[0]) if kills else None,
-                    'gold':int(coins.text) if coins else None}
+            if s.has('^退出$',*RAMPAGE_RESULT):
+                receipt={'kills':None,'gold':None}
+                if s.find('无法跨天结算',(1020,345,240,140)):
+                    receipt['status']='cross_day'
+                    name=f'rampage-cross-day-{self.task_counts["nest"]}.png'
+                else:
+                    name='rampage-result.png'
+                    kills=s.find(r'^(?:新纪录)?\s*\d{1,6}$',(1050,355,200,45))
+                    coins=s.find(r'^\d{1,9}$',(1070,400,180,45))
+                    if kills:receipt['kills']=int(re.search(r'\d+$',kills.text)[0])
+                    if coins:receipt['gold']=int(coins.text)
+                    if receipt['kills'] is None and self.b.tasker is not None:
+                        receipt['kills']=self.b.read_number(s,(1110,358,103,37))
+                self.b.save_screen(s,self.report['folder']/name)
+                self.report['rampage_settlement']=receipt
                 return s
+            if self.battle_return_page(s,returned):return s
+            if self.enable_battle_auto_deity('nest',s,auto_state):
+                self.b.sleep(.4);continue
             if time.monotonic()-feedback>=15:
                 self.note('暴走旷野挑战中，等待成绩结算…');feedback=time.monotonic()
             self.b.sleep(2)
-        raise SafetyStop('暴走旷野未在12分钟内结算，保留现场')
 
     def nest(self):
-        s=self.enter_building('谜之巢穴','^暴走旷野$')
-        self.b.click_text(s,'^暴走旷野$');s=self.rampage_ready()
-        score=self.rampage_score(s);self.report['rampage_score_start']=score
-        if score>0:
-            self.day['rampage_done']=True;self.save_state()
+        def mark_done(date):
+            self.state.setdefault(date,{})['rampage_done']=True
+            self.save_state()
+
+        self.active_task='nest'
+        s=self.rampage_ready(self.enter_building('谜之巢穴',RAMPAGE_TITLE))
+        s,score=self.read_rampage_score(s);self.report['rampage_score_start']=score
+        if score and not self.options['nest']['repeat_challenge']:
+            mark_done(datetime.now(BEIJING).date().isoformat())
             self.home();return f'今日暴走旷野已有{score}击破成绩，已跳过'
-        count=0
+        if score:self.note(f'重复挑战已开启：今日已有{score}击破成绩，按所选队伍再挑战一轮')
+        count=0;detail=''
         for team in team_order(self.options['nest']):
-            self.check_budget('nest')
-            if team is not None:s=self.apply_saved_team(s,team)
-            # Recheck the real ready page after copying, without changing allies.
-            s=self.rampage_ready();self.check_budget('nest');self.active_task='nest'
-            self.start_challenge('nest',s,'暴走旷野免费挑战')
-            result=self.rampage_battle();self.exit_result(result)
-            s=self.rampage_ready();score=self.rampage_score(s)
-            if score<=0:raise TaskBlocked('暴走旷野退出后未确认有效成绩')
-            count+=1;self.report['rampage_score_end']=score
-            self.record_daily_fight('nest',team,'score',score=score)
-            self.day['rampage_done']=True;self.save_state()
-            self.note(f'暴走旷野已结算，今日最高击破{score}')
-        self.home();return f'暴走旷野已完成{count}场，今日最高击破{score}'
+            s=self.rampage_ready(s)
+            if count:s,score=self.read_rampage_score(s)
+            if team is not None:
+                self.check_budget('nest')
+                s=self.rampage_ready(self.apply_saved_team(s,team))
+            while True:
+                self.check_budget('nest')
+                self.start_challenge('nest',s,'暴走旷野免费挑战')
+                result=self.rampage_battle();receipt={}
+                result_date=datetime.now(BEIJING).date().isoformat()
+                if result.has(*RAMPAGE_RESULT):
+                    receipt=self.report['rampage_settlement']
+                    s=self.exit_result(result)
+                else:s=result
+                kills=receipt.get('kills');gold=receipt.get('gold')
+                cross_day=receipt.get('status')=='cross_day'
+                if not cross_day and ((kills or 0)>0 or (gold or 0)>0):
+                    s,score=self.read_rampage_score(s) if rampage_challenge_page(s) else (s,None)
+                    break
+                s=self.rampage_ready(s)
+                before=score;s,score=self.read_rampage_score(s)
+                if not cross_day and score is not None and before is not None and score>before:break
+                self.note(('暴走旷野无法跨天结算，补打新一天的挑战' if cross_day else
+                           '暴走旷野尚未确认本场成绩，已返回挑战页，补打当前队伍'))
+            count+=1
+            self.report['rampage_score_end']=score
+            self.record_daily_fight('nest',team,'score',score=score,kills=kills)
+            mark_done(result_date)
+            if score:detail=f'今日最高击破{score}'
+            elif kills is not None:detail=f'本场击破{kills}'
+            else:detail=f'本场获得{gold}金币'
+            self.note('暴走旷野已结算，'+detail)
+        self.home()
+        return f'暴走旷野已完成{count}场，{detail}'

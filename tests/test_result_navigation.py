@@ -77,10 +77,10 @@ def test_a_swallowed_free_exit_is_retried_after_source_confirmation(tmp_path):
     assert len(d.report['navigation_retries'])==1 and d.battles==0
 
 
-def test_three_retries_then_preserve_scene_without_pressing_rematch(tmp_path):
+def test_seven_retries_then_preserve_scene_without_pressing_rematch(tmp_path):
     d,result,world,state,clicks=result_game(tmp_path)
-    with pytest.raises(TaskBlocked,match='已重试3次'):d.exit_result(result)
-    assert clicks==['^退出$']*4 and d.battles==0
+    with pytest.raises(TaskBlocked,match='已重试7次'):d.exit_result(result)
+    assert clicks==['^退出$']*8 and d.battles==0
     assert d.report['result_exits'][0]['status']=='blocked'
 
 

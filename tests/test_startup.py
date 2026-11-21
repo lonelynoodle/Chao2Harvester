@@ -100,6 +100,8 @@ def test_failed_startup_is_reported_and_stops_rest_of_queue(tmp_path,monkeypatch
     calls=queue(tmp_path,monkeypatch)
     def fail(self):raise TaskBlocked('进入超时')
     monkeypatch.setattr(flow.Daily,'startup',fail)
+    def unknown(self):raise TaskBlocked('当前界面未知，无法返回')
+    monkeypatch.setattr(flow.Daily,'home',unknown)
     result=flow.run_daily({},['startup','rewards'],threading.Event(),log=lambda _:None)
     assert result['status']=='blocked' and result['tasks']['startup']['status']=='blocked'
     assert calls==[]
@@ -123,7 +125,7 @@ def test_failure_on_second_execution_cannot_retain_first_completed_status(tmp_pa
     import chao2.task_queue as queue_module
     monkeypatch.setattr(queue_module,'plan_tasks',lambda *a:['rewards','rewards'])
     result=flow.run_daily({},['rewards'],threading.Event(),log=lambda _:None)
-    assert result['status']=='blocked'
+    assert result['status']=='partial'
     assert result['tasks']['rewards']['status']=='blocked'
-    assert result['tasks']['rewards']['message']=='第二轮结算超时'
+    assert result['tasks']['rewards']['message']=='本次续跑：第二轮结算超时'
     assert result['tasks']['rewards']['attempts']==2

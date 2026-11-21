@@ -14,16 +14,20 @@ def monster_roster(s):
 def blue_roster_cards(s,read_text=None):
     """Locate complete blue card frames after scrolling, then read their levels."""
     if not monster_roster(s):return []
+    return blue_card_frames(s,read_text,first_column=118,top_limit=175)
+
+
+def blue_card_frames(s,read_text=None,*,first_column,top_limit):
     hsv=cv2.cvtColor(s.image,cv2.COLOR_BGR2HSV)
     h,saturation,value=(hsv[:,:,i] for i in range(3))
     mask=((h>=85)&(h<=115)&(saturation>80)&(value>80)).astype('uint8')
-    mask[:175]=0;mask[700:]=0;mask[:,:110]=0
+    mask[:top_limit]=0;mask[700:]=0;mask[:,:first_column-8]=0
     _,_,stats,_=cv2.connectedComponentsWithStats(mask)
     rows=[]
     for left,top,width,height,area in stats[1:]:
         left,top,width,height,area=map(int,(left,top,width,height,area))
         if not (105<=width<=118 and 105<=height<=124 and area>1800):continue
-        if min(abs(left-x) for x in (118,244,370,496,622,748,874,1000,1126))>4:continue
+        if min(abs(left-first_column-126*i) for i in range(10))>4:continue
         # Require both vertical blue rims; a monster's blue body is not a card.
         blue=float(min(mask[top+10:top+98,left:left+7].mean(),
                        mask[top+10:top+98,left+width-7:left+width].mean()))
@@ -38,22 +42,52 @@ def blue_roster_cards(s,read_text=None):
     return sorted(rows,key=lambda row:(row['point'][1],row['point'][0]))
 
 
-def blue_monster_info(b,s):
-    if not s.find('^怪兽信息$',(90,0,230,60)) or not s.find('^进化$',(1000,395,180,90)):
+def selected_blue_roster_index(s,cards):
+    """The selected card has a continuous white glow on both outer edges."""
+    selected=[]
+    for index,row in enumerate(cards):
+        x,y=row['point']
+        top=s.image[y-59:y-48,x-35:x+35]
+        left=s.image[y-31:y+31,x-63:x-48]
+        if ((top.min(axis=2)>220).mean(axis=1).max()>.75 and
+                (left.min(axis=2)>220).mean(axis=0).max()>.75):
+            selected.append(index)
+    return selected[0] if len(selected)==1 else None
+
+
+def blue_monster_info(b,s,*,require_level_one=True):
+    if not s.find('^怪兽信息$',(90,0,230,60)):
         return False
     hsv=cv2.cvtColor(s.image[78:124,645:710],cv2.COLOR_BGR2HSV)
     h,saturation,value=(hsv[:,:,i] for i in range(3))
     blue=((h>=85)&(h<=115)&(saturation>90)&(value>100)).mean()
-    return blue>.20 and b.read_number(s,(687,418,35,45))==1
+    return blue>.20 and (not require_level_one or b.read_number(s,(687,418,35,45))==1)
 
 
-def purple_monster_info(b,s):
+def blue_evolution_unavailable(s):
+    if s.find('^人间大炮$',(645,78,410,50)):
+        return '人间大炮不可进化'
+    button=s.find('^进化$',(1000,395,180,90))
+    if button:
+        x,y,w,h=button.box
+        pixels=s.image[y:y+h,x:x+w]
+        dark=pixels.min(axis=2)
+        light=pixels.max(axis=2)
+        # Disabled text is dim neutral gray. Require visible glyphs so a
+        # missing or unreadable button is not treated as a disabled candidate.
+        dim_gray=(dark>=45)&(light<=130)&(light-dark<=22)
+        if dim_gray.mean()>=.24 and (light>=145).mean()<.01:
+            return '当前蓝怪的进化按钮为灰色'
+    return None
+
+
+def purple_monster_info(b,s,*,require_level_one=True):
     if not s.find('^怪兽信息$',(90,0,230,60)):
         return False
     hsv=cv2.cvtColor(s.image[78:124,645:710],cv2.COLOR_BGR2HSV)
     h,saturation,value=(hsv[:,:,i] for i in range(3))
     return (((h>=125)&(h<=165)&(saturation>90)&(value>100)).mean()>.20 and
-            b.read_number(s,(687,418,35,45))==1)
+            (not require_level_one or b.read_number(s,(687,418,35,45))==1))
 
 
 def evolution_result_name(b,s):

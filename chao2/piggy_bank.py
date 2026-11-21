@@ -2,15 +2,26 @@
 import re
 from datetime import datetime
 
-from .policy import TaskBlocked, SafetyStop
+from .policy import TaskBlocked, SafetyStop, PageChanged, IsolatedTaskError
 from .reward_collection import reward_overlay
-from .compact_balance import balance_bounds,balance_delta_possible,read_displayed_balance
+from .compact_balance import balance_bounds,balance_delta_possible,read_displayed_balance,read_fixed_balance
 
 PIGGY_NAME=r'^[屯囤电]{1,2}扑满$'
 STORED=r'^已储存(\d+)钻石和(\d+)金币$'
 STORED_LABEL=r'^已储存(\d+)[钻沾]石和(\d+)金币$'
 OFFER=r'^是否消耗50钻石购买1木[锤棰][?？]?$'
 LEFT_CLAIM=(400,565,285,90)
+WORLD_WALLET_ROI=(235,10,90,32)
+
+
+def piggy_cancel_button(s):
+    """Recognize only a wood-hammer buy/claim dialog's cancel action."""
+    if not s.find('^活动$',(90,0,160,65)):return None
+    purchase=s.find(r'^是否消耗\d+钻石购买\d+木[锤棰][?？]?$',(350,240,600,90))
+    claim=s.find('^可获得奖励$',(500,180,280,65))
+    if not ((purchase and s.find('^确定$',(680,440,250,100))) or
+            (claim and s.find('^领取$',(680,440,250,100)))):return None
+    return s.find('^取消$',(350,440,250,100))
 
 
 def is_piggy_page(s):
@@ -21,6 +32,30 @@ def is_piggy_page(s):
         s.find('^1钻石和1000金币$',(940,255,280,60)) and
         s.find('^立即领取$',LEFT_CLAIM) and
         not s.find('^取消$|^规则$|^获得奖励$'))
+
+
+def recover_piggy_storage(b,s):
+    """Restore the full stored sentence only after two independent crop reads."""
+    if is_piggy_page(s) or b.tasker is None:return s
+    if (not s.find('^活动$',(90,0,160,65)) or
+            not s.find(PIGGY_NAME,(190,100,340,145)) or
+            not s.find('^每次领取奖励消耗200活跃之星$',(520,430,410,50)) or
+            not s.find('^1钻石和1000金币$',(940,255,280,60)) or
+            not s.find('^立即领取$',LEFT_CLAIM) or
+            s.find('^取消$|^规则$|^获得奖励$')):return s
+    reads=[re.sub(r'\s','',b.read_text_crop(s,roi)) for roi in ((580,395,290,35),(590,395,275,40))]
+    match=re.fullmatch(STORED,reads[0])
+    if not match or reads[0]!=reads[1]:return s
+    stored,gold=map(int,match.groups())
+    if gold!=stored*1000:return s
+    partial=s.find(r'^已储存(\d+)(?:钻|沾)?石和(\d+)金币$',(510,390,440,45))
+    if partial:
+        original=re.fullmatch(r'^已储存(\d+)(?:钻|沾)?石和(\d+)金币$',partial.text)
+        if tuple(map(int,original.groups()))!=(stored,gold):return s
+    from .backend import Screen,Word
+    fresh=Screen(s.image,list(s.words),s.when)
+    fresh.words.append(Word(reads[0],[580,395,290,35],.99))
+    return fresh
 
 
 def piggy_purchase_confirmation(s,pending):
@@ -125,16 +160,31 @@ class PiggyBank:
 
     def piggy_wallet(self):
         world=self.home()
-        amount=self.world_resources(world).get('diamonds')
-        if isinstance(amount,int):return amount
-        return read_displayed_balance(self.b,world,(235,0,90,55))
+        return read_fixed_balance(self.b,world,WORLD_WALLET_ROI)
+
+    def cancel_failed_piggy_dialog(self):
+        s=self.b.observe()
+        if piggy_cancel_button(s) is None:return
+        previous=getattr(self.b,'piggy_cancel_only',False)
+        self.b.piggy_cancel_only=True
+        try:
+            self.b.click_text(s,'^取消$',roi=(350,440,250,100))
+            self.wait_for_screen(lambda q:piggy_cancel_button(q) is None,
+                                 '退出未完成的扑满确认窗口',timeout=4)
+        finally:self.b.piggy_cancel_only=previous
 
     def collect_piggy_bank(self):
         try:return self._collect_piggy_bank()
-        except TaskBlocked as error:
+        except (TaskBlocked,PageChanged) as error:
+            message=str(error)
             if self.state.get('piggy_pending'):
-                raise SafetyStop(str(error)+'；屯屯扑满交易已提交，保留记录，不重复购买或领取') from error
-            raise
+                message+='；屯屯扑满交易已提交或待核实，保留记录，不重复购买或领取'
+                if self.state['piggy_pending'].get('phase')=='buy_requested':
+                    self.report['piggy_spend_unconfirmed']=True
+            row=self.report.setdefault('other_tasks',{}).setdefault('piggy_bank',{})
+            row.update(status='blocked',message=message)
+            self.checkpoint();self.cancel_failed_piggy_dialog()
+            raise IsolatedTaskError(message) from error
 
     def _collect_piggy_bank(self):
         if not self.options['other']['piggy_bank']:
@@ -142,7 +192,7 @@ class PiggyBank:
         previous=self.report.get('other_tasks',{}).get('piggy_bank',{})
         if previous.get('claimed')==1:return previous
         if self.state.get('piggy_pending'):
-            raise SafetyStop('上次屯屯扑满交易尚未核实，保留现场，不重复购买或敲开')
+            raise TaskBlocked('上次屯屯扑满交易尚未核实，保留记录，不重复购买或敲开')
         row={'status':'running','spent':0,'claimed':0,'price':50,'quantity':1}
         self.report.setdefault('other_tasks',{})['piggy_bank']=row
         before=self.piggy_wallet();row['diamonds_before']=before
@@ -162,7 +212,7 @@ class PiggyBank:
                 s=self.wait_for_screen(lambda q:piggy_purchase_confirmation(q,row) is not None,
                     '50钻石木锤购买确认',timeout=4)
                 offer=read_piggy_offer(self.b,s,row)
-                if not balance_delta_possible(before,offer['balance'],0):raise SafetyStop('木锤购买前钻石余额变化，未购买')
+                if not balance_delta_possible(before,offer['balance'],0):raise TaskBlocked('木锤购买前钻石余额变化，未购买')
                 if offer['remaining']<1:
                     self.b.click_text(s,'^取消$',roi=(350,440,250,100))
                     row.update(status='skipped',message='屯屯扑满今日木锤购买次数已用完')
@@ -182,10 +232,11 @@ class PiggyBank:
                         q,after=self.piggy_view(q)
                         if after['stock']==1 and after['stored']==view['stored']:break
                     self.b.sleep(.5)
-                else:raise SafetyStop('木锤购买结果未核实，未重复购买')
+                else:raise TaskBlocked('木锤购买结果未核实，未重复购买')
             finally:self.b.piggy_purchase_pending=None
             balance=self.piggy_wallet()
-            if not balance_delta_possible(before,balance,-50):raise SafetyStop('木锤购买后的钻石扣款不是50，保留现场')
+            row['diamonds_after_purchase']=balance
+            if not balance_delta_possible(before,balance,-50):raise TaskBlocked('木锤购买后的钻石余额变化未核实为50，保留交易记录')
             row['spent']=50;row['diamonds_after_purchase']=balance
             self.report['piggy_diamond_spend']=50;self.report['piggy_spend_unconfirmed']=False
             self.report['diamond_spend']=50+self.report.get('merchant_diamond_spend',0)
@@ -197,11 +248,11 @@ class PiggyBank:
         if not self.options['other']['piggy_bank']:
             raise SafetyStop('未开启屯屯扑满，未领取')
         if row.get('claimed') or self.state.get('piggy_pending',{}).get('phase') not in (None,'purchased'):
-            raise SafetyStop('屯屯扑满仍有未核实交易，未重复领取')
+            raise TaskBlocked('屯屯扑满仍有未核实交易，未重复领取')
         if view['stored']<200 or view['stock']<1:
-            raise SafetyStop('木锤领取前奖励不足200或库存改变，未敲开')
+            raise TaskBlocked('木锤领取前奖励不足200或库存改变，未敲开')
         s,fresh=self.piggy_view()
-        if fresh!=view:raise SafetyStop('敲开前屯屯扑满余额变化，未领取')
+        if fresh!=view:raise TaskBlocked('敲开前屯屯扑满余额变化，未领取')
         row.update(stored_before_claim=view['stored'],stock_before_claim=view['stock'],
                    diamonds_before_claim=balance_before_claim)
         self.b.save_screen(s,self.report['folder']/'piggy-claim-before.png')
@@ -213,7 +264,7 @@ class PiggyBank:
 
     def _confirm_piggy_claim(self,row,view,balance_before_claim,s):
         if self.state.get('piggy_pending',{}).get('phase')!='claim_preview' or not piggy_claim_offer(self.b,s,row):
-            raise SafetyStop('屯屯扑满领取奖励或1木锤费用未核实，未确认')
+            raise TaskBlocked('屯屯扑满领取奖励或1木锤费用未核实，未确认')
         self.b.save_screen(s,self.report['folder']/'piggy-claim-confirm.png')
         self.piggy_journal(row,'claim_requested')
         self.b.click_text(s,'^领取$',roi=(680,440,250,100))
@@ -221,7 +272,7 @@ class PiggyBank:
 
     def _verify_piggy_claim(self,row,view,balance_before_claim):
         if self.state.get('piggy_pending',{}).get('phase')!='claim_requested':
-            raise SafetyStop('没有待核实的屯屯扑满领取记录')
+            raise TaskBlocked('没有待核实的屯屯扑满领取记录')
         receipt=bool(row.get('reward_text'))
         for _ in range(20):
             q=self.observe();self.b.guard(q)
@@ -235,10 +286,10 @@ class PiggyBank:
                     row['stored_remaining']=after['stored'];row['stock_remaining']=after['stock']
                     self.b.save_screen(q,self.report['folder']/'piggy-claimed.png');break
             self.b.sleep(.5)
-        else:raise SafetyStop('屯屯扑满领取结果未核实，未重复敲开')
+        else:raise TaskBlocked('屯屯扑满领取结果未核实，未重复敲开')
         balance=self.piggy_wallet()
         if not balance_delta_possible(balance_before_claim,balance,200):
-            raise SafetyStop('屯屯扑满200钻石到账余额未核实，未重复领取')
+            raise TaskBlocked('屯屯扑满200钻石到账余额未核实，未重复领取')
         row.update(status='done',phase='completed',claimed=1,diamonds_received=200,
                    diamonds_after=balance,receipt_observed=receipt,
                    message=f'屯屯扑满已敲开1次，获得200钻石；购买花费{row["spent"]}钻石，剩余储存{row["stored_remaining"]}')

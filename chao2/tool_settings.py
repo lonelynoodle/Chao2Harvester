@@ -2,6 +2,7 @@
 from copy import deepcopy
 from .configuration import TEAMS,number,normalize_teams
 from .puzzle_solver import MAX_SCORE
+from .wall_settings import wall_spec,validate_wall_mode
 
 PUZZLE_SPEC={'key':'puzzle','name':'拼二大作战',
              'legacy_goals':{'300':300,'1500':1500,'first':MAX_SCORE},
@@ -12,11 +13,11 @@ PUZZLE_SPEC={'key':'puzzle','name':'拼二大作战',
                   'description':'0表示未达目标就输后重开；正数包含启动时接续的当前局。'}]}
 
 TOUR_SPEC={'key':'tour','name':'幻境巡游','hint':'按阵容顺序尝试，失败换队；全部失败后换环境。',
-           'fields':[{**deepcopy(TEAMS),'default':[1,2,3]},
+           'fields':[{**deepcopy(TEAMS),'default':[1,2,3]},wall_spec(),
                      {**number('max_battles','最多挑战次数',100,500),'min':1}]}
 
 ABYSS_SPEC={'key':'abyss','name':'深渊先遣',
-            'fields':[{**deepcopy(TEAMS),'default':[1,2,3]}]}
+            'fields':[{**deepcopy(TEAMS),'default':[1,2,3]},wall_spec()]}
 
 def puzzle_options(settings):
     raw=dict(settings)
@@ -47,9 +48,9 @@ def tour_options(settings):
     teams=normalize_teams(raw.get('teams',[1,2,3]))
     maximum=raw.get('max_battles',100)
     if type(maximum) is not int or not 1<=maximum<=500:raise ValueError('幻境巡游挑战上限必须为1至500')
-    return {'teams':teams,'max_battles':maximum}
+    return {'teams':teams,'wall_mode':validate_wall_mode(raw.get('wall_mode','ignore')),'max_battles':maximum}
 
 def abyss_options(settings):
     raw=settings.get('abyss_options',{})
     if not isinstance(raw,dict):raise ValueError('深渊先遣设置格式错误')
-    return {'teams':normalize_teams(raw.get('teams',[1,2,3]))}
+    return {'teams':normalize_teams(raw.get('teams',[1,2,3])),'wall_mode':validate_wall_mode(raw.get('wall_mode','ignore'))}

@@ -70,13 +70,13 @@ def test_user_stop_interrupts_continuous_retry_before_another_click(tmp_path):
     assert len(clicks)==2
 
 
-def test_continuous_retry_still_respects_match_timeout(tmp_path,monkeypatch):
-    d,clicks,_=simulation(tmp_path,[battle(3) for _ in range(100)])
+def test_continuous_retry_keeps_waiting_for_a_long_active_match(tmp_path,monkeypatch):
+    d,clicks,_=simulation(tmp_path,[battle(3) for _ in range(40)]+[result()])
     d.b.settings['battle_timeout_seconds']=1
-    ticks=iter(range(0,2000,25))
+    ticks=iter(range(0,20000,25))
     monkeypatch.setattr('chao2.triad.time',SimpleNamespace(monotonic=lambda:next(ticks)))
-    with pytest.raises(SafetyStop,match='时限内结算'):d.triad_match(lobby(3))
-    assert 3<len(clicks)<100 and d.battles==0
+    assert d.triad_match(lobby(3))[1]=='victory'
+    assert len(clicks)==40 and d.battles==0 and d.report['battle_wait_extensions']
 
 
 def test_retries_count_one_finished_match_and_one_free_attempt(tmp_path):

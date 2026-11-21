@@ -25,7 +25,7 @@ def test_swallowed_next_click_retries_then_keeps_floor_chain_and_secret_scope(tm
     game.d.b.click_text=click
     game.d.tower()
     assert len(game.challenges)==4 and game.balance==0
-    assert game.secrets==['normal'] and game.opened==['normal']
+    assert game.secrets==['normal','dragon','puppet'] and game.opened==['normal']
     assert game.next_clicks==3 and game.d.report['tower_next_clicks']==4
     assert len(game.d.report['navigation_retries'])==1
 
